@@ -9,6 +9,7 @@ services:
     volumes:
       # Persist database across container restarts
       - ./data:/app/data
+      - ./app:/app/app   
     environment:
       - DATABASE_PATH=/app/data/trio.db
     restart: unless-stopped
