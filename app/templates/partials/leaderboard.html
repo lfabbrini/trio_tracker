@@ -1,0 +1,61 @@
+{% if leaderboard %}
+<div class="space-y-3">
+    {% for player in leaderboard %}
+    <div class="flex items-center gap-4 p-3 rounded-xl transition-all duration-200 hover:bg-white/5 {% if loop.index <= 3 and player.wins > 0 %}bg-gradient-to-r from-yellow-400/5 to-transparent{% endif %}">
+        
+        <!-- Rank Badge -->
+        <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
+            {% if loop.index == 1 and player.wins > 0 %}rank-1 shadow-lg shadow-yellow-500/30
+            {% elif loop.index == 2 and player.wins > 0 %}rank-2 shadow-lg shadow-slate-400/30
+            {% elif loop.index == 3 and player.wins > 0 %}rank-3 shadow-lg shadow-orange-600/30
+            {% else %}bg-slate-700 text-slate-300{% endif %}">
+            {% if loop.index == 1 and player.wins > 0 %}
+                <span class="text-xl">👑</span>
+            {% elif loop.index == 2 and player.wins > 0 %}
+                🥈
+            {% elif loop.index == 3 and player.wins > 0 %}
+                🥉
+            {% else %}
+                {{ loop.index }}
+            {% endif %}
+        </div>
+        
+        <!-- Player Info -->
+        <div class="flex-grow min-w-0">
+            <div class="flex items-center gap-2">
+                <span class="font-semibold text-white truncate">{{ player.name }}</span>
+                {% if loop.index == 1 and player.wins > 0 %}
+                <span class="text-yellow-400 text-sm animate-pulse">★</span>
+                {% endif %}
+            </div>
+            
+            <!-- Win bar visualization -->
+            {% if leaderboard[0].wins > 0 %}
+            <div class="mt-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div class="win-bar h-full rounded-full transition-all duration-500"
+                     style="width: {{ (player.wins / leaderboard[0].wins * 100) | round }}%"></div>
+            </div>
+            {% endif %}
+        </div>
+        
+        <!-- Stats -->
+        <div class="flex-shrink-0 text-right">
+            <div class="text-xl font-bold text-white">{{ player.wins }}</div>
+            <div class="text-xs text-slate-400">
+                {% if player.matches_played > 0 %}
+                    {{ player.win_rate }}% <span class="text-slate-500">({{ player.matches_played }})</span>
+                {% else %}
+                    —
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8 text-slate-400">
+    <p class="text-4xl mb-3">🎴</p>
+    <p>No players yet!</p>
+    <p class="text-sm text-slate-500">Add some players to get started</p>
+</div>
+{% endif %}

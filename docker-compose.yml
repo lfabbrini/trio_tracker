@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  trio-tracker:
+    build: .
+    container_name: trio-tracker
+    ports:
+      - "8080:8080"
+    volumes:
+      # Persist database across container restarts
+      - ./data:/app/data
+    environment:
+      - DATABASE_PATH=/app/data/trio.db
+    restart: unless-stopped
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

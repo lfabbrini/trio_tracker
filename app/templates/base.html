@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🃏 Trio Tracker</title>
+    
+    <!-- DaisyUI + Tailwind via CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.6.0/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Google Fonts - Distinctive typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --gold: #F6C343;
+            --gold-light: #FFE4A0;
+            --emerald: #10B981;
+            --ruby: #EF4444;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+        }
+        
+        .font-display {
+            font-family: 'Playfair Display', serif;
+        }
+        
+        /* Card table texture overlay */
+        .table-texture {
+            position: relative;
+        }
+        .table-texture::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: 
+                radial-gradient(ellipse at 30% 20%, rgba(246, 195, 67, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 70% 80%, rgba(16, 185, 129, 0.06) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+        
+        /* Glowing card effect */
+        .card-glow {
+            box-shadow: 
+                0 0 20px rgba(246, 195, 67, 0.1),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(246, 195, 67, 0.2);
+            backdrop-filter: blur(10px);
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.95) 100%);
+        }
+        
+        /* Winner badge glow */
+        .winner-glow {
+            text-shadow: 0 0 20px rgba(246, 195, 67, 0.5);
+        }
+        
+        /* Animated trophy */
+        @keyframes float {
+            0%, 100% { transform: translateY(0) rotate(-2deg); }
+            50% { transform: translateY(-5px) rotate(2deg); }
+        }
+        .trophy-float {
+            animation: float 3s ease-in-out infinite;
+        }
+        
+        /* Progress bar styling */
+        .win-bar {
+            background: linear-gradient(90deg, var(--gold) 0%, var(--emerald) 100%);
+            box-shadow: 0 0 10px rgba(246, 195, 67, 0.4);
+        }
+        
+        /* Rank badges */
+        .rank-1 { background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%); color: #1a1a2e; }
+        .rank-2 { background: linear-gradient(135deg, #C0C0C0 0%, #A0A0A0 100%); color: #1a1a2e; }
+        .rank-3 { background: linear-gradient(135deg, #CD7F32 0%, #A0522D 100%); color: #fff; }
+        
+        /* Smooth HTMX transitions */
+        .htmx-settling {
+            opacity: 0;
+        }
+        .htmx-swapping {
+            opacity: 0;
+            transition: opacity 0.15s ease-out;
+        }
+        .htmx-added {
+            animation: fadeSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes fadeSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Checkbox styling */
+        .player-checkbox:checked + label {
+            background: linear-gradient(135deg, rgba(246, 195, 67, 0.2) 0%, rgba(16, 185, 129, 0.2) 100%);
+            border-color: var(--gold);
+            box-shadow: 0 0 15px rgba(246, 195, 67, 0.3);
+        }
+        
+        /* Winner radio styling */
+        .winner-radio:checked + label {
+            background: linear-gradient(135deg, rgba(246, 195, 67, 0.3) 0%, rgba(255, 200, 100, 0.2) 100%);
+            border-color: var(--gold);
+            box-shadow: 0 0 20px rgba(246, 195, 67, 0.4);
+        }
+        
+        /* Recent match item hover */
+        .match-item {
+            transition: all 0.2s ease;
+        }
+        .match-item:hover {
+            transform: translateX(5px);
+            background: rgba(246, 195, 67, 0.05);
+        }
+
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.2);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(246, 195, 67, 0.3);
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: rgba(246, 195, 67, 0.5);
+        }
+        
+        /* ===== FUN CARD SUIT ANIMATIONS ===== */
+        
+        /* Floating card suits container */
+        .card-suits {
+            display: flex;
+            gap: 0.5rem;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        
+        .card-suit {
+            transition: all 0.3s ease;
+            animation: suitBounce 2s ease-in-out infinite;
+            display: inline-block;
+        }
+        
+        .card-suit:nth-child(1) { animation-delay: 0s; }
+        .card-suit:nth-child(2) { animation-delay: 0.15s; }
+        .card-suit:nth-child(3) { animation-delay: 0.3s; }
+        .card-suit:nth-child(4) { animation-delay: 0.45s; }
+        
+        @keyframes suitBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        
+        .card-suit:hover {
+            transform: scale(1.4) rotate(15deg) !important;
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+        
+        .card-suit.spade { color: #64748b; }
+        .card-suit.heart { color: #ef4444; }
+        .card-suit.club { color: #64748b; }
+        .card-suit.diamond { color: #ef4444; }
+        
+        /* Shuffle animation on click */
+        .card-suits.shuffling .card-suit {
+            animation: shuffle 0.6s ease-in-out;
+        }
+        
+        @keyframes shuffle {
+            0% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-20px) rotate(-180deg) scale(0.8); }
+            50% { transform: translateY(10px) rotate(-360deg) scale(1.2); }
+            75% { transform: translateY(-5px) rotate(-540deg); }
+            100% { transform: translateY(0) rotate(-720deg) scale(1); }
+        }
+        
+        /* Confetti effect */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            overflow: hidden;
+        }
+        
+        .confetti {
+            position: absolute;
+            font-size: 2rem;
+            animation: confettiFall 3s ease-out forwards;
+        }
+        
+        @keyframes confettiFall {
+            0% {
+                transform: translateY(-100px) rotate(0deg);
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(100vh) rotate(720deg);
+                opacity: 0;
+            }
+        }
+        
+        /* Success flash on match record */
+        @keyframes successPulse {
+            0% { box-shadow: 0 0 0 0 rgba(246, 195, 67, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(246, 195, 67, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(246, 195, 67, 0); }
+        }
+        
+        .success-pulse {
+            animation: successPulse 0.6s ease-out;
+        }
+    </style>
+</head>
+<body class="table-texture min-h-screen">
+    <!-- Confetti container (for celebrations) -->
+    <div id="confetti-container" class="confetti-container"></div>
+    
+    <!-- Header -->
+    <header class="relative z-10 py-6 px-4 sm:px-8">
+        <div class="max-w-6xl mx-auto flex items-center justify-between">
+            <div class="flex items-center gap-4">
+                <span class="text-5xl trophy-float">🃏</span>
+                <div>
+                    <h1 class="font-display text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-yellow-400 to-amber-500 winner-glow">
+                        TRIO TRACKER
+                    </h1>
+                    <p class="text-slate-400 text-sm tracking-widest uppercase">Break Time Champions</p>
+                </div>
+            </div>
+            
+            <!-- Fun card suits animation -->
+            <div class="card-suits" onclick="shuffleCards()" title="Click to shuffle!">
+                <span class="card-suit spade">♠</span>
+                <span class="card-suit heart">♥</span>
+                <span class="card-suit club">♣</span>
+                <span class="card-suit diamond">♦</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="relative z-10 px-4 sm:px-8 pb-12">
+        <div class="max-w-6xl mx-auto">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="relative z-10 text-center py-6 text-slate-500 text-sm">
+        <p>Made with ♠️ ♥️ ♣️ ♦️ for break time fun</p>
+    </footer>
+
+    <script>
+        // Shuffle cards animation
+        function shuffleCards() {
+            const container = document.querySelector('.card-suits');
+            container.classList.add('shuffling');
+            
+            setTimeout(() => {
+                container.classList.remove('shuffling');
+            }, 600);
+        }
+        
+        // Confetti celebration
+        function celebrate() {
+            const container = document.getElementById('confetti-container');
+            const suits = ['♠', '♥', '♣', '♦'];
+            const colors = ['#FFD700', '#EF4444', '#10B981', '#3B82F6'];
+            
+            for (let i = 0; i < 30; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.textContent = suits[Math.floor(Math.random() * suits.length)];
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.color = colors[Math.floor(Math.random() * colors.length)];
+                    confetti.style.animationDuration = (2 + Math.random() * 2) + 's';
+                    container.appendChild(confetti);
+                    
+                    setTimeout(() => confetti.remove(), 4000);
+                }, i * 50);
+            }
+        }
+        
+        // Handle participant selection to show/hide winner options
+        function updateWinnerOptions() {
+            const checkboxes = document.querySelectorAll('input[name="participants"]');
+            const winnerContainer = document.getElementById('winner-selection');
+            if (!winnerContainer) return;
+            
+            const selectedPlayers = [];
+            
+            checkboxes.forEach(cb => {
+                if (cb.checked) {
+                    selectedPlayers.push({
+                        id: cb.value,
+                        name: cb.dataset.name
+                    });
+                }
+            });
+            
+            if (selectedPlayers.length >= 2) {
+                winnerContainer.classList.remove('hidden');
+                winnerContainer.innerHTML = `
+                    <p class="text-sm text-slate-400 mb-3 uppercase tracking-wider">Who won? 👑</p>
+                    <div class="flex flex-wrap gap-2">
+                        ${selectedPlayers.map((p, i) => `
+                            <div>
+                                <input type="radio" name="winner_id" value="${p.id}" 
+                                       id="winner-${p.id}" class="winner-radio hidden peer" ${i === 0 ? 'required' : ''}>
+                                <label for="winner-${p.id}" 
+                                       class="cursor-pointer px-4 py-2 rounded-lg border-2 border-slate-600 
+                                              hover:border-yellow-400/50 transition-all duration-200 block
+                                              peer-checked:border-yellow-400 peer-checked:bg-yellow-400/10">
+                                    ${p.name}
+                                </label>
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            } else {
+                winnerContainer.classList.add('hidden');
+                winnerContainer.innerHTML = '';
+            }
+            
+            // Update submit button state
+            const submitBtn = document.getElementById('submit-match');
+            if (submitBtn) {
+                submitBtn.disabled = selectedPlayers.length < 2;
+            }
+        }
+        
+        // Attach listener to document for dynamically added checkboxes
+        document.addEventListener('change', function(e) {
+            if (e.target.name === 'participants') {
+                updateWinnerOptions();
+            }
+        });
+        
+        // Celebrate on successful match recording!
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            // Check if this was a match recording (target is match-form)
+            if (evt.detail.target && evt.detail.target.id === 'match-form') {
+                celebrate();
+                
+                // Add pulse effect to leaderboard
+                const leaderboard = document.getElementById('leaderboard');
+                if (leaderboard) {
+                    leaderboard.classList.add('success-pulse');
+                    setTimeout(() => leaderboard.classList.remove('success-pulse'), 600);
+                }
+            }
+        });
+    </script>
+</body>
+</html>

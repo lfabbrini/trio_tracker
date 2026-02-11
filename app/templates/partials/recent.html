@@ -1,0 +1,37 @@
+{% if recent_matches %}
+<div class="space-y-2 max-h-64 overflow-y-auto pr-2">
+    {% for match in recent_matches %}
+    <div class="match-item flex items-center gap-3 p-3 rounded-lg border border-slate-700/50">
+        
+        <!-- Trophy icon -->
+        <span class="text-xl">🏅</span>
+        
+        <!-- Match details -->
+        <div class="flex-grow min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="font-semibold text-yellow-400">{{ match.winner_name }}</span>
+                <span class="text-slate-500">won against</span>
+                <span class="text-slate-300">
+                    {% if match.opponents %}
+                        {{ match.opponents | map(attribute='name') | join(', ') }}
+                    {% else %}
+                        others
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        
+        <!-- Timestamp -->
+        <div class="flex-shrink-0 text-xs text-slate-500">
+            {{ match.played_at | relative_time }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-8 text-slate-400">
+    <p class="text-4xl mb-3">🎲</p>
+    <p>No matches recorded yet</p>
+    <p class="text-sm text-slate-500">Record your first game above!</p>
+</div>
+{% endif %}

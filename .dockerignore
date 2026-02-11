@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Database (don't include local dev database in build)
+data/*.db
+
+# IDE
+.idea/
+.vscode/
+
+# Docker
+docker-compose.yml
+Dockerfile
+
+# Docs
+README.md

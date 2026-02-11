@@ -1,0 +1,11 @@
+{% if players %}
+<div class="flex flex-wrap gap-2">
+    {% for player in players %}
+    <span class="px-3 py-1 rounded-full bg-slate-700 text-white text-sm">
+        {{ player.name }}
+    </span>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-slate-500 text-sm">No players yet</p>
+{% endif %}

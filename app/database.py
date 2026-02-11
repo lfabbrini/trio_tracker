@@ -1,0 +1,195 @@
+import sqlite3
+import os
+from datetime import datetime
+from typing import Optional
+from contextlib import contextmanager
+
+# Use environment variable, or fall back to local data directory
+DEFAULT_DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "trio.db")
+DATABASE_PATH = os.environ.get("DATABASE_PATH", DEFAULT_DB_PATH)
+
+
+def get_db_path():
+    """Get database path, creating directory if needed."""
+    db_dir = os.path.dirname(DATABASE_PATH)
+    if db_dir and not os.path.exists(db_dir):
+        os.makedirs(db_dir)
+    return DATABASE_PATH
+
+
+@contextmanager
+def get_connection():
+    """Context manager for database connections."""
+    conn = sqlite3.connect(get_db_path())
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+    finally:
+        conn.close()
+
+
+def init_db():
+    """Initialize database with schema."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Players table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS players (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        
+        # Matches table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS matches (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                winner_id INTEGER NOT NULL,
+                played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (winner_id) REFERENCES players(id)
+            )
+        """)
+        
+        # Match participants junction table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS match_players (
+                match_id INTEGER NOT NULL,
+                player_id INTEGER NOT NULL,
+                PRIMARY KEY (match_id, player_id),
+                FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE CASCADE,
+                FOREIGN KEY (player_id) REFERENCES players(id)
+            )
+        """)
+        
+        conn.commit()
+
+
+# Player operations
+def get_all_players():
+    """Get all players ordered by name."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM players ORDER BY name")
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def add_player(name: str) -> Optional[dict]:
+    """Add a new player. Returns the player or None if exists."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        try:
+            cursor.execute("INSERT INTO players (name) VALUES (?)", (name.strip(),))
+            conn.commit()
+            cursor.execute("SELECT * FROM players WHERE id = ?", (cursor.lastrowid,))
+            return dict(cursor.fetchone())
+        except sqlite3.IntegrityError:
+            return None
+
+
+def delete_player(player_id: int) -> bool:
+    """Delete a player by ID."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM players WHERE id = ?", (player_id,))
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+# Match operations
+def record_match(winner_id: int, participant_ids: list[int]) -> dict:
+    """Record a new match with participants."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Insert match
+        cursor.execute(
+            "INSERT INTO matches (winner_id) VALUES (?)",
+            (winner_id,)
+        )
+        match_id = cursor.lastrowid
+        
+        # Insert participants
+        for player_id in participant_ids:
+            cursor.execute(
+                "INSERT INTO match_players (match_id, player_id) VALUES (?, ?)",
+                (match_id, player_id)
+            )
+        
+        conn.commit()
+        return {"id": match_id, "winner_id": winner_id, "participants": participant_ids}
+
+
+def get_leaderboard():
+    """Get player stats for leaderboard."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                p.id,
+                p.name,
+                COUNT(DISTINCT m.id) as wins,
+                COUNT(DISTINCT mp.match_id) as matches_played,
+                CASE 
+                    WHEN COUNT(DISTINCT mp.match_id) > 0 
+                    THEN ROUND(COUNT(DISTINCT m.id) * 100.0 / COUNT(DISTINCT mp.match_id), 1)
+                    ELSE 0 
+                END as win_rate
+            FROM players p
+            LEFT JOIN matches m ON p.id = m.winner_id
+            LEFT JOIN match_players mp ON p.id = mp.player_id
+            GROUP BY p.id
+            ORDER BY wins DESC, win_rate DESC, p.name
+        """)
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_most_active():
+    """Get players ranked by participation."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                p.id,
+                p.name,
+                COUNT(mp.match_id) as matches_played
+            FROM players p
+            LEFT JOIN match_players mp ON p.id = mp.player_id
+            GROUP BY p.id
+            HAVING matches_played > 0
+            ORDER BY matches_played DESC, p.name
+        """)
+        return [dict(row) for row in cursor.fetchall()]
+
+
+def get_recent_matches(limit: int = 10):
+    """Get recent matches with participants."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT 
+                m.id,
+                m.played_at,
+                m.winner_id,
+                w.name as winner_name
+            FROM matches m
+            JOIN players w ON m.winner_id = w.id
+            ORDER BY m.played_at DESC
+            LIMIT ?
+        """, (limit,))
+        
+        matches = []
+        for row in cursor.fetchall():
+            match = dict(row)
+            # Get participants for this match
+            cursor.execute("""
+                SELECT p.id, p.name 
+                FROM match_players mp
+                JOIN players p ON mp.player_id = p.id
+                WHERE mp.match_id = ? AND p.id != ?
+            """, (match['id'], match['winner_id']))
+            match['opponents'] = [dict(r) for r in cursor.fetchall()]
+            matches.append(match)
+        
+        return matches

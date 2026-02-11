@@ -1,0 +1,61 @@
+{% if players and players | length >= 2 %}
+<form hx-post="/matches" 
+      hx-target="#match-form"
+      hx-swap="innerHTML"
+      class="space-y-6">
+    
+    <!-- Step 1: Select participants -->
+    <div>
+        <p class="text-sm text-slate-400 mb-3 uppercase tracking-wider">Who played? (select 2+)</p>
+        <div class="flex flex-wrap gap-2">
+            {% for player in players %}
+            <div>
+                <input type="checkbox" 
+                       name="participants" 
+                       value="{{ player.id }}" 
+                       id="player-{{ player.id }}"
+                       data-name="{{ player.name }}"
+                       class="player-checkbox hidden peer">
+                <label for="player-{{ player.id }}" 
+                       class="cursor-pointer px-4 py-2 rounded-lg border-2 border-slate-600 
+                              hover:border-emerald-400/50 transition-all duration-200 block
+                              peer-checked:border-emerald-400 peer-checked:bg-emerald-400/10
+                              peer-checked:shadow-lg peer-checked:shadow-emerald-500/20">
+                    {{ player.name }}
+                </label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    
+    <!-- Step 2: Select winner (populated by JS) -->
+    <div id="winner-selection" class="hidden">
+        <!-- Dynamically populated when 2+ players selected -->
+    </div>
+    
+    <!-- Submit button -->
+    <button type="submit" 
+            id="submit-match"
+            disabled
+            class="w-full py-3 px-6 rounded-xl font-bold text-lg
+                   bg-gradient-to-r from-yellow-400 to-amber-500 
+                   text-slate-900 shadow-lg shadow-yellow-500/30
+                   hover:shadow-yellow-500/50 hover:scale-[1.02]
+                   disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
+                   transition-all duration-200">
+        🏆 Record Match
+    </button>
+</form>
+{% elif players and players | length == 1 %}
+<div class="text-center py-8 text-slate-400">
+    <p class="text-4xl mb-3">👤</p>
+    <p>Need at least 2 players!</p>
+    <p class="text-sm text-slate-500">Add another player below</p>
+</div>
+{% else %}
+<div class="text-center py-8 text-slate-400">
+    <p class="text-4xl mb-3">👥</p>
+    <p>No players yet!</p>
+    <p class="text-sm text-slate-500">Add some players below to get started</p>
+</div>
+{% endif %}

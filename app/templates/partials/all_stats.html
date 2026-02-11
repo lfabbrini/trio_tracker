@@ -1,0 +1,15 @@
+<!-- Main response: update the match form -->
+{% include "partials/match_form.html" %}
+
+<!-- Out-of-band swaps: update other sections simultaneously -->
+<div id="leaderboard" hx-swap-oob="true">
+    {% include "partials/leaderboard.html" %}
+</div>
+
+<div id="most-active" hx-swap-oob="true">
+    {% include "partials/most_active.html" %}
+</div>
+
+<div id="recent-matches" hx-swap-oob="true">
+    {% include "partials/recent.html" %}
+</div>

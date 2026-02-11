@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Column: Leaderboard & Most Active -->
+    <div class="lg:col-span-1 space-y-6">
+        
+        <!-- Leaderboard Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">🏆</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 to-amber-400">
+                    LEADERBOARD
+                </h2>
+            </div>
+            
+            <div id="leaderboard" hx-get="/partials/leaderboard" hx-trigger="every 30s">
+                {% include "partials/leaderboard.html" %}
+            </div>
+        </div>
+        
+        <!-- Most Active Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">📊</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-400">
+                    MOST ACTIVE
+                </h2>
+            </div>
+            
+            <div id="most-active" hx-get="/partials/most-active" hx-trigger="every 30s">
+                {% include "partials/most_active.html" %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Right Column: Record Match & Manage Players -->
+    <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Record Match Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">🎯</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-300 to-pink-400">
+                    RECORD A MATCH
+                </h2>
+            </div>
+            
+            <div id="match-form">
+                {% include "partials/match_form.html" %}
+            </div>
+        </div>
+        
+        <!-- Player Management Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">👥</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-violet-300 to-purple-400">
+                    MANAGE PLAYERS
+                </h2>
+            </div>
+            
+            <div id="player-management">
+                {% include "partials/player_management.html" %}
+            </div>
+        </div>
+        
+        <!-- Recent Matches Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">📜</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 to-blue-400">
+                    RECENT MATCHES
+                </h2>
+            </div>
+            
+            <div id="recent-matches" hx-get="/partials/recent" hx-trigger="every 30s">
+                {% include "partials/recent.html" %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

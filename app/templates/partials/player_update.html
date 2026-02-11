@@ -1,0 +1,7 @@
+<!-- Main response: update the player management section -->
+{% include "partials/player_management.html" %}
+
+<!-- Out-of-band swap: update the match form too (so new players appear) -->
+<div id="match-form" hx-swap-oob="true">
+    {% include "partials/match_form.html" %}
+</div>
