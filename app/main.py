@@ -143,6 +143,14 @@ async def delete_player(request: Request, player_id: int):
     })
 
 
+@app.get("/partials/win-streaks", response_class=HTMLResponse)
+async def win_streaks_partial(request: Request):
+    """Win streaks fragment for HTMX."""
+    return templates.TemplateResponse("partials/win_streaks.html", {
+        "request": request,
+        "win_streaks": db.get_win_streaks(),
+    })
+
 @app.post("/matches", response_class=HTMLResponse)
 async def record_match(
     request: Request,
@@ -165,4 +173,5 @@ async def record_match(
         "leaderboard": db.get_leaderboard(),
         "most_active": db.get_most_active(),
         "recent_matches": db.get_recent_matches(),
+        "win_streaks": db.get_win_streaks(),
     })

@@ -193,3 +193,50 @@ def get_recent_matches(limit: int = 10):
             matches.append(match)
         
         return matches
+
+def get_win_streaks():
+    """Get current win streak for each player (consecutive wins from most recent match)."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        
+        # Get matches in order (newest first)
+        cursor.execute("""
+            SELECT m.winner_id, p.name
+            FROM matches m
+            JOIN players p ON m.winner_id = p.id
+            ORDER BY m.played_at DESC
+        """)
+        
+        matches = cursor.fetchall()
+        
+        if not matches:
+            return []
+        
+        # The current streak holder is whoever won the most recent match
+        # Count how many consecutive wins they have
+        streaks = {}
+        last_winner = None
+        
+        for match in matches:
+            winner_id = match['winner_id']
+            winner_name = match['name']
+            
+            if last_winner is None:
+                # First match - start counting
+                last_winner = winner_id
+                streaks[winner_id] = {'name': winner_name, 'streak': 1}
+            elif winner_id == last_winner:
+                # Same person won - streak continues!
+                streaks[winner_id]['streak'] += 1
+            else:
+                # Different winner - streak is broken, stop counting
+                break
+        
+        # Return only players with streak >= 2
+        result = [
+            {'player_id': pid, 'name': data['name'], 'streak': data['streak']}
+            for pid, data in streaks.items()
+            if data['streak'] >= 2
+        ]
+        
+        return result

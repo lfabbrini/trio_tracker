@@ -20,6 +20,20 @@
             </div>
         </div>
         
+        <!-- Win Streaks Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">🔥</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">
+                    ON FIRE
+                </h2>
+            </div>
+            
+            <div id="win-streaks" hx-get="/partials/win-streaks" hx-trigger="every 30s">
+                {% include "partials/win_streaks.html" %}
+            </div>
+        </div>
+
         <!-- Most Active Card -->
         <div class="card-glow rounded-2xl p-6">
             <div class="flex items-center gap-3 mb-6">

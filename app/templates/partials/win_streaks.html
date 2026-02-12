@@ -1,0 +1,16 @@
+{% if win_streaks %}
+<div class="space-y-2">
+    {% for streak in win_streaks %}
+    <div class="flex items-center gap-3 p-3 rounded-xl bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/30">
+        <span class="text-2xl animate-pulse">🔥</span>
+        <span class="text-white font-bold">{{ streak.name }}</span>
+        <span class="text-orange-400 font-semibold">{{ streak.streak }} wins in a row!</span>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="text-center py-4 text-slate-500 text-sm">
+    <p>No active win streaks</p>
+    <p class="text-xs">Win 2+ matches in a row to appear here!</p>
+</div>
+{% endif %}
