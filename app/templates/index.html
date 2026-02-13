@@ -34,6 +34,20 @@
             </div>
         </div>
 
+        <!-- Podium Days Card -->
+        <div class="card-glow rounded-2xl p-6">
+            <div class="flex items-center gap-3 mb-6">
+                <span class="text-3xl">&#x1F3C6;</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-300 to-indigo-400">
+                    PODIUM DAYS
+                </h2>
+            </div>
+
+            <div id="podium-days" hx-get="/partials/podium-days" hx-trigger="every 30s">
+                {% include "partials/podium_days.html" %}
+            </div>
+        </div>
+
         <!-- Most Active Card -->
         <div class="card-glow rounded-2xl p-6">
             <div class="flex items-center gap-3 mb-6">
@@ -42,7 +56,7 @@
                     MOST ACTIVE
                 </h2>
             </div>
-            
+
             <div id="most-active" hx-get="/partials/most-active" hx-trigger="every 30s">
                 {% include "partials/most_active.html" %}
             </div>

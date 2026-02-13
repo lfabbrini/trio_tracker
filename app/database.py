@@ -238,5 +238,75 @@ def get_win_streaks():
             for pid, data in streaks.items()
             if data['streak'] >= 2
         ]
-        
+
+        return result
+
+
+def get_podium_days():
+    """Get how many match days each player held a top-3 leaderboard position.
+
+    For each player, tracks their best (lowest) position and how many
+    calendar days with matches they held that position.
+    """
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # Get all distinct match days
+        cursor.execute("SELECT DISTINCT DATE(played_at) as match_day FROM matches ORDER BY match_day")
+        match_days = [row['match_day'] for row in cursor.fetchall()]
+
+        if not match_days:
+            return []
+
+        # For each match day, compute cumulative leaderboard up to that day
+        # and track who held positions 1-3
+        # player_id -> {name, best_position, days_at_best}
+        player_podium = {}
+
+        for day in match_days:
+            # Cumulative leaderboard up to end of this day
+            cursor.execute("""
+                SELECT
+                    p.id,
+                    p.name,
+                    COUNT(DISTINCT m.id) as wins,
+                    COUNT(DISTINCT mp.match_id) as matches_played,
+                    CASE
+                        WHEN COUNT(DISTINCT mp.match_id) > 0
+                        THEN ROUND(COUNT(DISTINCT m.id) * 100.0 / COUNT(DISTINCT mp.match_id), 1)
+                        ELSE 0
+                    END as win_rate
+                FROM players p
+                LEFT JOIN matches m ON p.id = m.winner_id AND DATE(m.played_at) <= ?
+                LEFT JOIN match_players mp ON p.id = mp.player_id
+                    AND mp.match_id IN (SELECT id FROM matches WHERE DATE(played_at) <= ?)
+                GROUP BY p.id
+                HAVING matches_played > 0
+                ORDER BY wins DESC, win_rate DESC, p.name
+            """, (day, day))
+
+            rows = cursor.fetchall()
+
+            # Top 3 positions
+            for pos_idx, row in enumerate(rows[:3]):
+                position = pos_idx + 1
+                pid = row['id']
+                name = row['name']
+
+                if pid not in player_podium:
+                    player_podium[pid] = {'name': name, 'best_position': position, 'days': 1}
+                elif position < player_podium[pid]['best_position']:
+                    # Found a better position - reset
+                    player_podium[pid] = {'name': name, 'best_position': position, 'days': 1}
+                elif position == player_podium[pid]['best_position']:
+                    player_podium[pid]['days'] += 1
+
+        result = [
+            {'name': data['name'], 'best_position': data['best_position'], 'days': data['days']}
+            for data in player_podium.values()
+        ]
+
+        # Sort by best_position ASC, then days DESC
+        result.sort(key=lambda x: (x['best_position'], -x['days']))
+
         return result

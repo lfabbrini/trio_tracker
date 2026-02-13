@@ -60,6 +60,7 @@ async def index(request: Request):
         "leaderboard": db.get_leaderboard(),
         "most_active": db.get_most_active(),
         "recent_matches": db.get_recent_matches(),
+        "podium_days": db.get_podium_days(),
     })
 
 
@@ -151,6 +152,15 @@ async def win_streaks_partial(request: Request):
         "win_streaks": db.get_win_streaks(),
     })
 
+@app.get("/partials/podium-days", response_class=HTMLResponse)
+async def podium_days_partial(request: Request):
+    """Podium days fragment for HTMX."""
+    return templates.TemplateResponse("partials/podium_days.html", {
+        "request": request,
+        "podium_days": db.get_podium_days(),
+    })
+
+
 @app.post("/matches", response_class=HTMLResponse)
 async def record_match(
     request: Request,
@@ -160,12 +170,12 @@ async def record_match(
     """Record a match result."""
     if winner_id not in participants:
         raise HTTPException(status_code=400, detail="Winner must be a participant")
-    
+
     if len(participants) < 2:
         raise HTTPException(status_code=400, detail="At least 2 players required")
-    
+
     db.record_match(winner_id, participants)
-    
+
     # Return all updated sections
     return templates.TemplateResponse("partials/all_stats.html", {
         "request": request,
@@ -174,4 +184,5 @@ async def record_match(
         "most_active": db.get_most_active(),
         "recent_matches": db.get_recent_matches(),
         "win_streaks": db.get_win_streaks(),
+        "podium_days": db.get_podium_days(),
     })
