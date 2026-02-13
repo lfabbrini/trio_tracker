@@ -48,17 +48,17 @@
             </div>
         </div>
 
-        <!-- Most Active Card -->
+        <!-- Weekly Leaderboard Card -->
         <div class="card-glow rounded-2xl p-6">
             <div class="flex items-center gap-3 mb-6">
-                <span class="text-3xl">📊</span>
-                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-400">
-                    MOST ACTIVE
+                <span class="text-3xl">📅</span>
+                <h2 class="font-display text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-300 to-blue-400">
+                    WEEKLY LEADERBOARD
                 </h2>
             </div>
 
-            <div id="most-active" hx-get="/partials/most-active" hx-trigger="every 30s">
-                {% include "partials/most_active.html" %}
+            <div id="weekly-leaderboard" hx-get="/partials/most-active" hx-trigger="every 30s">
+                {% include "partials/weekly_leaderboard.html" %}
             </div>
         </div>
     </div>

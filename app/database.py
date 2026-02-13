@@ -145,22 +145,47 @@ def get_leaderboard():
         return [dict(row) for row in cursor.fetchall()]
 
 
-def get_most_active():
-    """Get players ranked by participation."""
+def get_weekly_leaderboard():
+    """Get leaderboard stats filtered to the current Mon-Fri work week."""
+    from datetime import timedelta
+
+    today = datetime.now().date()
+    # Monday = 0, Sunday = 6
+    monday = today - timedelta(days=today.weekday())
+    friday = monday + timedelta(days=4)
+    week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).isoformat()
+    week_end = datetime(friday.year, friday.month, friday.day, 23, 59, 59).isoformat()
+
     with get_connection() as conn:
         cursor = conn.cursor()
         cursor.execute("""
-            SELECT 
+            SELECT
                 p.id,
                 p.name,
-                COUNT(mp.match_id) as matches_played
+                COUNT(DISTINCT m.id) as wins,
+                COUNT(DISTINCT mp.match_id) as matches_played,
+                CASE
+                    WHEN COUNT(DISTINCT mp.match_id) > 0
+                    THEN ROUND(COUNT(DISTINCT m.id) * 100.0 / COUNT(DISTINCT mp.match_id), 1)
+                    ELSE 0
+                END as win_rate
             FROM players p
+            LEFT JOIN matches m ON p.id = m.winner_id
+                AND m.played_at BETWEEN ? AND ?
             LEFT JOIN match_players mp ON p.id = mp.player_id
+                AND mp.match_id IN (SELECT id FROM matches WHERE played_at BETWEEN ? AND ?)
             GROUP BY p.id
             HAVING matches_played > 0
-            ORDER BY matches_played DESC, p.name
-        """)
-        return [dict(row) for row in cursor.fetchall()]
+            ORDER BY wins DESC, win_rate DESC, p.name
+        """, (week_start, week_end, week_start, week_end))
+
+        players = [dict(row) for row in cursor.fetchall()]
+
+    return {
+        "players": players,
+        "week_start": monday.strftime("%d/%m"),
+        "week_end": friday.strftime("%d/%m"),
+    }
 
 
 def get_recent_matches(limit: int = 10):

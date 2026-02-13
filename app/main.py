@@ -58,7 +58,7 @@ async def index(request: Request):
         "request": request,
         "players": db.get_all_players(),
         "leaderboard": db.get_leaderboard(),
-        "most_active": db.get_most_active(),
+        "weekly_leaderboard": db.get_weekly_leaderboard(),
         "recent_matches": db.get_recent_matches(),
         "podium_days": db.get_podium_days(),
     })
@@ -76,11 +76,11 @@ async def leaderboard_partial(request: Request):
 
 
 @app.get("/partials/most-active", response_class=HTMLResponse)
-async def most_active_partial(request: Request):
-    """Most active players fragment for HTMX."""
-    return templates.TemplateResponse("partials/most_active.html", {
+async def weekly_leaderboard_partial(request: Request):
+    """Weekly leaderboard fragment for HTMX."""
+    return templates.TemplateResponse("partials/weekly_leaderboard.html", {
         "request": request,
-        "most_active": db.get_most_active(),
+        "weekly_leaderboard": db.get_weekly_leaderboard(),
     })
 
 
@@ -181,7 +181,7 @@ async def record_match(
         "request": request,
         "players": db.get_all_players(),
         "leaderboard": db.get_leaderboard(),
-        "most_active": db.get_most_active(),
+        "weekly_leaderboard": db.get_weekly_leaderboard(),
         "recent_matches": db.get_recent_matches(),
         "win_streaks": db.get_win_streaks(),
         "podium_days": db.get_podium_days(),

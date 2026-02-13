@@ -1,0 +1,47 @@
+{% if weekly_leaderboard.players %}
+<p class="text-slate-400 text-xs mb-3">{{ weekly_leaderboard.week_start }} - {{ weekly_leaderboard.week_end }}</p>
+<div class="space-y-3">
+    {% for player in weekly_leaderboard.players[:5] %}
+    <div class="flex items-center gap-4 p-3 rounded-xl transition-all duration-200 hover:bg-white/5 {% if loop.index <= 3 %}bg-gradient-to-r from-cyan-400/5 to-transparent{% endif %}">
+
+        <!-- Rank Badge -->
+        <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
+            {% if loop.index == 1 %}bg-gradient-to-br from-cyan-400 to-blue-500 text-slate-900 shadow-lg shadow-cyan-500/30
+            {% elif loop.index == 2 %}bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900 shadow-lg shadow-slate-400/30
+            {% elif loop.index == 3 %}bg-gradient-to-br from-amber-700 to-amber-900 text-white shadow-lg shadow-amber-700/30
+            {% else %}bg-slate-700 text-slate-300{% endif %}">
+            {{ loop.index }}
+        </div>
+
+        <!-- Player Info -->
+        <div class="flex-grow min-w-0">
+            <div class="flex items-center gap-2">
+                <span class="font-semibold text-white truncate">{{ player.name }}</span>
+            </div>
+
+            <!-- Win bar visualization -->
+            {% if weekly_leaderboard.players[0].wins > 0 %}
+            <div class="mt-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
+                <div class="weekly-bar h-full rounded-full transition-all duration-500"
+                     style="width: {{ (player.wins / weekly_leaderboard.players[0].wins * 100) | round }}%"></div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Stats -->
+        <div class="flex-shrink-0 text-right">
+            <div class="text-xl font-bold text-white">{{ player.wins }}</div>
+            <div class="text-xs text-slate-400">
+                {{ player.win_rate }}% <span class="text-slate-500">({{ player.matches_played }})</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<p class="text-slate-400 text-xs mb-3">{{ weekly_leaderboard.week_start }} - {{ weekly_leaderboard.week_end }}</p>
+<div class="text-center py-6 text-slate-400">
+    <p class="text-2xl mb-2">📅</p>
+    <p class="text-sm">No matches this week yet</p>
+</div>
+{% endif %}
