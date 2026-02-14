@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request, Form, HTTPException
+from fastapi import FastAPI, Request, Form, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import List
@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import os
 
 from . import database as db
+from .game_manager import game_manager
 
 app = FastAPI(title="Trio Tracker", description="Track your Trio card game wins!")
 
@@ -193,3 +194,77 @@ async def record_match(
         "win_streaks": db.get_win_streaks(),
         "podium_days": db.get_podium_days(),
     })
+
+
+# === GAME ROUTES ===
+
+@app.get("/game", response_class=HTMLResponse)
+async def game_lobby(request: Request):
+    """Game lobby page."""
+    return templates.TemplateResponse("game/lobby.html", {
+        "request": request,
+        "rooms": game_manager.list_rooms(),
+    })
+
+
+@app.post("/game/create")
+async def create_game_room(room_name: str = Form(...)):
+    """Create a new game room."""
+    room = game_manager.create_room(room_name.strip() or "Game Room")
+    return JSONResponse({
+        "success": True,
+        "room_id": room.id,
+        "room_name": room.name
+    })
+
+
+@app.get("/game/rooms")
+async def list_game_rooms():
+    """List available game rooms."""
+    return JSONResponse({
+        "rooms": game_manager.list_rooms()
+    })
+
+
+@app.get("/game/{room_id}", response_class=HTMLResponse)
+async def game_room(request: Request, room_id: str):
+    """Game room page."""
+    room = game_manager.get_room(room_id)
+    if not room:
+        return templates.TemplateResponse("game/room_not_found.html", {
+            "request": request,
+            "room_id": room_id
+        })
+    
+    return templates.TemplateResponse("game/room.html", {
+        "request": request,
+        "room": room.to_dict(),
+        "room_id": room_id,
+    })
+
+
+@app.websocket("/ws/game/{room_id}")
+async def game_websocket(websocket: WebSocket, room_id: str, player_name: str = "Player"):
+    """WebSocket connection for real-time game play."""
+    await websocket.accept()
+    
+    # Connect player to room
+    player_id = await game_manager.connect(websocket, room_id, player_name)
+    
+    if not player_id:
+        await websocket.close()
+        return
+    
+    try:
+        while True:
+            # Receive message from player
+            data = await websocket.receive_json()
+            
+            # Process action
+            await game_manager.handle_action(room_id, player_id, data)
+            
+    except WebSocketDisconnect:
+        await game_manager.disconnect(player_id)
+    except Exception as e:
+        print(f"WebSocket error: {e}")
+        await game_manager.disconnect(player_id)
