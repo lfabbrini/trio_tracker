@@ -126,18 +126,18 @@ class GameRoom:
     # Connected numbers for SPICY mode (which numbers connect to which)
     # In Trio, connected numbers are shown in card corners
     CONNECTIONS = {
-        1: [2, 3],
-        2: [1, 3, 4],
-        3: [1, 2, 4, 5],
-        4: [2, 3, 5, 6],
-        5: [3, 4, 6, 7],
-        6: [4, 5, 7, 8],
-        7: [5, 6, 8, 9],
-        8: [6, 7, 9, 10],
-        9: [7, 8, 10, 11],
-        10: [8, 9, 11, 12],
-        11: [9, 10, 12],
-        12: [10, 11]
+        1: [6, 8],
+        2: [5, 9],
+        3: [4, 10],
+        4: [3, 11],
+        5: [2, 12],
+        6: [1],
+        7: [],
+        8: [1],
+        9: [2],
+        10: [3],
+        11: [4],
+        12: [5]
     }
     
     @property
