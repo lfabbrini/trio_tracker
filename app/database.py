@@ -267,6 +267,61 @@ def get_win_streaks():
         return result
 
 
+def get_weekly_history(weeks: int = 8):
+    """Get wins per player per week for the last N weeks.
+
+    Returns a dict with 'labels' (week date strings) and 'datasets'
+    (one entry per player with their weekly win counts).
+    """
+    from datetime import timedelta
+
+    today = datetime.now().date()
+    # Current week's Monday
+    current_monday = today - timedelta(days=today.weekday())
+
+    # Build week boundaries (oldest first)
+    week_boundaries = []
+    for i in range(weeks - 1, -1, -1):
+        monday = current_monday - timedelta(weeks=i)
+        friday = monday + timedelta(days=4)
+        week_boundaries.append((monday, friday))
+
+    labels = [f"{m.strftime('%d/%m')}" for m, f in week_boundaries]
+
+    with get_connection() as conn:
+        cursor = conn.cursor()
+
+        # Collect wins per player per week
+        player_wins = {}  # player_name -> [wins_per_week]
+
+        for week_idx, (monday, friday) in enumerate(week_boundaries):
+            week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).isoformat()
+            week_end = datetime(friday.year, friday.month, friday.day, 23, 59, 59).isoformat()
+
+            cursor.execute("""
+                SELECT p.name, COUNT(m.id) as wins
+                FROM matches m
+                JOIN players p ON m.winner_id = p.id
+                WHERE m.played_at BETWEEN ? AND ?
+                GROUP BY p.id
+            """, (week_start, week_end))
+
+            week_results = {row['name']: row['wins'] for row in cursor.fetchall()}
+
+            for name, wins in week_results.items():
+                if name not in player_wins:
+                    player_wins[name] = [0] * weeks
+                player_wins[name][week_idx] = wins
+
+    # Build datasets, sorted by total wins descending
+    datasets = []
+    for name, wins in player_wins.items():
+        datasets.append({"player_name": name, "wins": wins})
+    datasets.sort(key=lambda d: sum(d["wins"]), reverse=True)
+
+    return {"labels": labels, "datasets": datasets}
+
+
 def get_podium_days():
     """Get how many match days each player held a top-3 leaderboard position.
 

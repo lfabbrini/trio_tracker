@@ -1,0 +1,114 @@
+<canvas id="weekly-history-canvas"></canvas>
+<div id="weekly-history-empty" class="text-center text-slate-400 py-12 hidden">
+    <span class="text-4xl block mb-3">📊</span>
+    <p>Not enough data yet</p>
+    <p class="text-sm text-slate-500 mt-1">Play some matches and check back!</p>
+</div>
+
+<script>
+(function() {
+    const COLORS = [
+        '#F6C343', // gold
+        '#22d3ee', // cyan
+        '#10B981', // emerald
+        '#EF4444', // red
+        '#8B5CF6', // violet
+        '#F97316', // orange
+        '#EC4899', // pink
+        '#6366F1', // indigo
+        '#14B8A6', // teal
+        '#F59E0B', // amber
+    ];
+
+    let chartInstance = null;
+
+    function loadChart() {
+        fetch('/api/weekly-history')
+            .then(r => r.json())
+            .then(data => {
+                const canvas = document.getElementById('weekly-history-canvas');
+                const emptyMsg = document.getElementById('weekly-history-empty');
+                if (!canvas) return;
+
+                if (!data.datasets || data.datasets.length === 0) {
+                    canvas.style.display = 'none';
+                    emptyMsg.classList.remove('hidden');
+                    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+                    return;
+                }
+
+                canvas.style.display = '';
+                emptyMsg.classList.add('hidden');
+
+                const datasets = data.datasets.map((ds, i) => ({
+                    label: ds.player_name,
+                    data: ds.wins,
+                    borderColor: COLORS[i % COLORS.length],
+                    backgroundColor: COLORS[i % COLORS.length],
+                    tension: 0.3,
+                    borderWidth: 2.5,
+                    pointRadius: 4,
+                    pointHoverRadius: 6,
+                }));
+
+                if (chartInstance) { chartInstance.destroy(); }
+
+                chartInstance = new Chart(canvas, {
+                    type: 'line',
+                    data: { labels: data.labels, datasets: datasets },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: {
+                                grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                                ticks: { color: '#94a3b8', font: { family: 'Outfit' } },
+                            },
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(148, 163, 184, 0.1)' },
+                                ticks: {
+                                    color: '#94a3b8',
+                                    font: { family: 'Outfit' },
+                                    stepSize: 1,
+                                    precision: 0,
+                                },
+                            },
+                        },
+                        plugins: {
+                            legend: {
+                                labels: {
+                                    color: '#94a3b8',
+                                    font: { family: 'Outfit', size: 13 },
+                                    usePointStyle: true,
+                                    pointStyle: 'circle',
+                                    padding: 16,
+                                },
+                            },
+                            tooltip: {
+                                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                titleColor: '#F6C343',
+                                bodyColor: '#e2e8f0',
+                                titleFont: { family: 'Outfit', weight: 'bold' },
+                                bodyFont: { family: 'Outfit' },
+                                cornerRadius: 8,
+                                padding: 12,
+                            },
+                        },
+                    },
+                });
+            });
+    }
+
+    // Initial load
+    loadChart();
+
+    // Refresh after match recording
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        if (evt.detail.target && evt.detail.target.id === 'match-form') {
+            loadChart();
+        }
+    });
+})();
+</script>

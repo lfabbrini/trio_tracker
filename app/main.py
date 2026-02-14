@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request, Form, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import List
 from datetime import datetime, timezone
@@ -159,6 +159,13 @@ async def podium_days_partial(request: Request):
         "request": request,
         "podium_days": db.get_podium_days(),
     })
+
+
+@app.get("/api/weekly-history")
+async def weekly_history_api(weeks: int = 8):
+    """Return weekly win history as JSON for Chart.js."""
+    data = db.get_weekly_history(weeks=weeks)
+    return JSONResponse(content=data)
 
 
 @app.post("/matches", response_class=HTMLResponse)
