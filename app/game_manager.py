@@ -655,12 +655,8 @@ class TrioGameManager:
         win = await self.check_win_condition(room_id, player.id)
         
         if not win:
-            # Same player continues their turn!
-            await self.send_game_state(room_id)
-            await self.send_to_player(room_id, room.current_player_id, {
-                "type": "your_turn",
-                "message": "Great trio! Continue your turn - find another!"
-            })
+            # Turn ends - next player!
+            await self.next_turn(room_id)
     
     async def fail_turn(self, room_id: str):
         """Current player's turn failed - return all revealed cards."""
