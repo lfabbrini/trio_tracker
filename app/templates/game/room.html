@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🃏 Trio Game - {{ room.name }}</title>
+    
+    <!-- DaisyUI + Tailwind -->
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.6.0/dist/full.min.css" rel="stylesheet" type="text/css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+    
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0a4d0a 0%, #0d5d0d 50%, #0a3d0a 100%);
+        }
+        
+        .font-display {
+            font-family: 'Playfair Display', serif;
+        }
+        
+        .felt-texture {
+            background-image: radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.03) 0%, transparent 70%);
+        }
+        
+        .card-glow {
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+        }
+        
+        /* Playing cards - classic design */
+        .playing-card {
+            width: 65px;
+            height: 91px;
+            background: linear-gradient(145deg, #ffffff 0%, #f5f5f5 100%);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            cursor: pointer;
+            transition: all 0.2s ease;
+            user-select: none;
+            position: relative;
+            border: 1px solid #ddd;
+        }
+        
+        .playing-card .number {
+            font-size: 1.5rem;
+            font-weight: bold;
+            line-height: 1;
+        }
+        
+        .playing-card .suit {
+            font-size: 1.75rem;
+            line-height: 1;
+        }
+        
+        .playing-card.red { color: #dc2626; }
+        .playing-card.black { color: #1f2937; }
+        
+        .playing-card:hover:not(.disabled):not(.face-down) {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+        }
+        
+        .playing-card.face-down {
+            background: linear-gradient(145deg, #1e40af 0%, #1e3a8a 100%);
+            border: 2px solid #3b82f6;
+            cursor: pointer;
+        }
+        
+        .playing-card.face-down::before {
+            content: "🂠";
+            font-size: 2.5rem;
+            color: rgba(255,255,255,0.3);
+        }
+        
+        .playing-card.face-down:hover:not(.disabled) {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(30, 64, 175, 0.5);
+        }
+        
+        .playing-card.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        .playing-card.empty-space {
+            background: transparent;
+            border: 2px dashed rgba(255,255,255,0.15);
+            box-shadow: none;
+        }
+        
+        .playing-card.empty-space::before {
+            content: "";
+        }
+        
+        .playing-card.clickable-card {
+            cursor: pointer !important;
+        }
+        
+        .playing-card.clickable-card:hover {
+            transform: translateY(-10px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(251, 191, 36, 0.4);
+            border-color: #fbbf24;
+        }
+        
+        .playing-card.revealed {
+            border: 3px solid #fbbf24;
+            box-shadow: 0 0 20px rgba(251, 191, 36, 0.5);
+        }
+        
+        .playing-card.small {
+            width: 45px;
+            height: 63px;
+        }
+        
+        .playing-card.small .number { font-size: 1rem; }
+        .playing-card.small .suit { font-size: 1.25rem; }
+        
+        /* Card corner labels */
+        .card-label {
+            position: absolute;
+            font-size: 0.6rem;
+            font-weight: bold;
+            padding: 1px 4px;
+            border-radius: 3px;
+        }
+        
+        .card-label.low {
+            bottom: 2px;
+            left: 2px;
+            background: #3b82f6;
+            color: white;
+        }
+        
+        .card-label.high {
+            bottom: 2px;
+            right: 2px;
+            background: #ef4444;
+            color: white;
+        }
+        
+        /* Player action buttons */
+        .player-action-btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 0.5rem;
+            transition: all 0.2s;
+        }
+        
+        .player-action-btn.low {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+        }
+        
+        .player-action-btn.high {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+        
+        .player-action-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        
+        .player-action-btn:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
+        }
+        
+        /* Turn indicator */
+        .turn-banner {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+            color: #1f2937;
+            padding: 0.5rem 1.5rem;
+            border-radius: 9999px;
+            font-weight: 700;
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4);
+            animation: turnPulse 2s ease-in-out infinite;
+        }
+        
+        .turn-banner.other {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            color: white;
+            animation: none;
+            box-shadow: none;
+        }
+        
+        @keyframes turnPulse {
+            0%, 100% { box-shadow: 0 4px 15px rgba(251, 191, 36, 0.4); }
+            50% { box-shadow: 0 4px 25px rgba(251, 191, 36, 0.8); }
+        }
+        
+        .your-turn-glow {
+            animation: areaGlow 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes areaGlow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.5); }
+            50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+        }
+        
+        /* Reveal sequence */
+        .reveal-sequence {
+            display: flex;
+            gap: 1rem;
+            padding: 1.5rem;
+            background: rgba(251, 191, 36, 0.1);
+            border: 2px dashed rgba(251, 191, 36, 0.5);
+            border-radius: 1rem;
+            min-height: 130px;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        /* Mode badges */
+        .mode-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        
+        .mode-simple { background: #6366f1; color: white; }
+        .mode-spicy { background: #ef4444; color: white; }
+        
+        /* Animations */
+        @keyframes cardReveal {
+            0% { transform: rotateY(180deg) scale(0.8); }
+            100% { transform: rotateY(0deg) scale(1); }
+        }
+        
+        .card-reveal-anim {
+            animation: cardReveal 0.4s ease-out;
+        }
+        
+        @keyframes cardFail {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+        
+        .card-fail-anim {
+            animation: cardFail 0.5s ease-out;
+            border-color: #ef4444 !important;
+        }
+        
+        /* Confetti */
+        .confetti-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1000;
+            overflow: hidden;
+        }
+        
+        .confetti {
+            position: absolute;
+            font-size: 2rem;
+            animation: confettiFall 3s ease-out forwards;
+        }
+        
+        @keyframes confettiFall {
+            0% { transform: translateY(-100px) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+        }
+    </style>
+</head>
+<body class="min-h-screen felt-texture">
+    
+    <!-- Confetti container -->
+    <div id="confetti-container" class="confetti-container"></div>
+    
+    <!-- Header -->
+    <header class="p-4 flex items-center justify-between flex-wrap gap-4">
+        <div class="flex items-center gap-4">
+            <a href="/game" class="btn btn-sm btn-ghost text-white/70 hover:text-white">
+                ← Leave
+            </a>
+            <div>
+                <h1 class="font-display text-xl sm:text-2xl font-bold text-white">{{ room.name }}</h1>
+                <p class="text-white/50 text-sm">
+                    Code: <span class="text-yellow-400 font-mono font-bold">{{ room.id }}</span>
+                    <button onclick="copyRoomCode()" class="ml-2 hover:text-yellow-400">📋</button>
+                    <span id="mode-badge" class="mode-badge mode-simple ml-2">SIMPLE</span>
+                </p>
+            </div>
+        </div>
+        
+        <!-- Turn Indicator (top right) -->
+        <div id="turn-banner" class="turn-banner other">
+            Waiting...
+        </div>
+    </header>
+    
+    <!-- Main Game Area -->
+    <main class="max-w-7xl mx-auto p-2 sm:p-4 grid grid-cols-1 lg:grid-cols-4 gap-4">
+        
+        <!-- Left Sidebar -->
+        <div class="lg:col-span-1 space-y-4">
+            
+            <!-- Game Mode Selection -->
+            <div id="mode-selection" class="card-glow rounded-xl p-4">
+                <h3 class="text-white font-bold mb-3">🎮 Game Mode</h3>
+                <div class="flex gap-2">
+                    <button onclick="setMode('simple')" id="btn-simple" 
+                            class="flex-1 py-2 px-3 rounded-lg font-semibold text-sm bg-indigo-500 text-white">
+                        SIMPLE
+                    </button>
+                    <button onclick="setMode('spicy')" id="btn-spicy"
+                            class="flex-1 py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70">
+                        🌶️ SPICY
+                    </button>
+                </div>
+                <p id="mode-description" class="text-white/50 text-xs mt-2">
+                    Win with 3 trios or the 7-trio
+                </p>
+            </div>
+            
+            <!-- Players -->
+            <div class="card-glow rounded-xl p-4">
+                <h3 class="text-white font-bold mb-3">👥 Players</h3>
+                <div id="players-list" class="space-y-3"></div>
+                
+                <div id="start-game-container" class="mt-4 hidden">
+                    <button onclick="startGame()" 
+                            class="w-full py-2 rounded-lg font-bold
+                                   bg-gradient-to-r from-emerald-500 to-green-600 
+                                   text-white hover:scale-105 transition-transform">
+                        🎮 Start Game
+                    </button>
+                    <p class="text-white/50 text-xs mt-1 text-center">Need 3-6 players</p>
+                </div>
+            </div>
+            
+            <!-- Chat -->
+            <div class="card-glow rounded-xl p-4">
+                <h3 class="text-white font-bold mb-3">💬 Game Log</h3>
+                <div id="chat-messages" class="h-40 overflow-y-auto space-y-1 mb-3 text-xs"></div>
+                <form id="chat-form" class="flex gap-2">
+                    <input type="text" id="chat-input" placeholder="Chat..."
+                           class="flex-grow px-2 py-1 rounded-lg bg-white/10 border border-white/20 
+                                  text-white text-sm placeholder:text-white/30 focus:outline-none">
+                    <button type="submit" class="px-3 py-1 rounded-lg bg-yellow-500 text-slate-900 text-sm font-bold">
+                        Send
+                    </button>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Center/Right: Game Area -->
+        <div class="lg:col-span-3 space-y-4">
+            
+            <!-- Current Reveal Sequence -->
+            <div id="reveal-area" class="card-glow rounded-xl p-4">
+                <h3 class="text-white/70 text-sm mb-2">
+                    🎯 Current Reveal
+                    <span id="reveal-hint" class="text-yellow-400 ml-2"></span>
+                </h3>
+                <div id="reveal-sequence" class="reveal-sequence">
+                    <p class="text-white/30">Revealed cards appear here</p>
+                </div>
+            </div>
+            
+            <!-- Middle Cards -->
+            <div id="middle-area" class="card-glow rounded-xl p-4">
+                <h3 class="text-white/70 text-sm mb-3">
+                    📦 Middle Cards 
+                    <span id="middle-count" class="text-yellow-400">(0)</span>
+                </h3>
+                <div id="middle-cards" class="flex flex-wrap gap-2 justify-center min-h-[100px]">
+                    <p class="text-white/30">Game hasn't started yet</p>
+                </div>
+            </div>
+            
+            <!-- Other Players -->
+            <div id="other-players-area" class="card-glow rounded-xl p-4">
+                <h3 class="text-white/70 text-sm mb-3">👥 Reveal from Players</h3>
+                <div id="other-players-reveal" class="flex flex-wrap gap-4">
+                    <p class="text-white/30">Other players' cards will appear here</p>
+                </div>
+            </div>
+            
+            <!-- Your Hand -->
+            <div id="your-hand-area" class="card-glow rounded-xl p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-white font-bold">🃏 Your Hand <span class="text-white/50 font-normal">(sorted low → high)</span></h3>
+                </div>
+                <div id="your-hand" class="flex flex-wrap gap-2 justify-center min-h-[100px]">
+                    <p class="text-white/30">Waiting for game to start...</p>
+                </div>
+            </div>
+            
+        </div>
+    </main>
+    
+    <!-- Rules Footer -->
+    <footer class="max-w-7xl mx-auto p-4 text-center text-white/30 text-xs">
+        <p>🎯 Find 3 matching numbers | ✅ Match = keep revealing | ❌ Mismatch = turn ends | 🏆 7-trio = instant win!</p>
+    </footer>
+    
+    <script>
+        // Card suits for display
+        const SUITS = ['♠', '♥', '♣', '♦'];
+        const SUIT_COLORS = { '♠': 'black', '♥': 'red', '♣': 'black', '♦': 'red' };
+        
+        // Map card numbers to suits (deterministic based on card id)
+        function getCardSuit(cardId) {
+            return SUITS[cardId % 4];
+        }
+        
+        function getCardColor(cardId) {
+            return SUIT_COLORS[getCardSuit(cardId)];
+        }
+        
+        // Game state
+        const roomId = "{{ room_id }}";
+        const urlParams = new URLSearchParams(window.location.search);
+        const playerName = urlParams.get('name') || localStorage.getItem('trio_player_name') || 'Player';
+        
+        let ws = null;
+        let myPlayerId = null;
+        let isMyTurn = false;
+        let gameState = 'waiting';
+        let currentMode = 'simple';
+        let players = {};
+        let middleCards = [];
+        let revealedCards = [];
+        let currentPlayerName = '';
+        let myHandData = null;  // Store hand data to re-render when turn changes
+        
+        // Connect to WebSocket
+        function connect() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            ws = new WebSocket(`${protocol}//${window.location.host}/ws/game/${roomId}?player_name=${encodeURIComponent(playerName)}`);
+            
+            ws.onopen = () => {
+                addChatMessage('System', 'Connected to game!', 'system');
+            };
+            
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleMessage(data);
+            };
+            
+            ws.onclose = () => {
+                addChatMessage('System', 'Disconnected. Reconnecting...', 'error');
+                setTimeout(connect, 3000);
+            };
+        }
+        
+        // Handle messages
+        function handleMessage(data) {
+            console.log('Received:', data);
+            
+            switch(data.type) {
+                case 'welcome':
+                    myPlayerId = data.player_id;
+                    updateRoom(data.room);
+                    break;
+                    
+                case 'player_joined':
+                    updateRoom(data.room);
+                    addChatMessage('System', `${data.player.name} joined`, 'system');
+                    break;
+                    
+                case 'player_disconnected':
+                    addChatMessage('System', `${data.player_name} left`, 'error');
+                    updateRoom(data.room);
+                    break;
+                    
+                case 'mode_changed':
+                    currentMode = data.mode;
+                    updateModeUI();
+                    addChatMessage('System', `Mode: ${data.mode.toUpperCase()}`, 'system');
+                    break;
+                    
+                case 'game_started':
+                    gameState = 'playing';
+                    currentMode = data.mode;
+                    currentPlayerName = data.current_player;
+                    document.getElementById('mode-selection').classList.add('hidden');
+                    document.getElementById('start-game-container').classList.add('hidden');
+                    updateModeUI();
+                    updateTurnBanner();
+                    addChatMessage('System', `🎮 Game started! ${data.current_player} goes first.`, 'system');
+                    break;
+                    
+                case 'your_hand':
+                    myHandData = data.hand;  // Store for re-render
+                    renderHand(data.hand);
+                    break;
+                    
+                case 'game_state':
+                    updateGameState(data);
+                    break;
+                    
+                case 'your_turn':
+                    isMyTurn = true;
+                    currentPlayerName = playerName;
+                    updateTurnBanner();
+                    document.getElementById('your-hand-area').classList.add('your-turn-glow');
+                    // Re-render hand so cards become clickable
+                    if (myHandData) {
+                        renderHand(myHandData);
+                    }
+                    // Re-render other players so buttons become enabled
+                    if (Object.keys(players).length > 0) {
+                        renderOtherPlayers(Object.values(players), myPlayerId);
+                    }
+                    // Re-render middle cards so they become clickable
+                    renderMiddleCards();
+                    break;
+                    
+                case 'card_revealed':
+                    // Only log action, not the number (memory game!)
+                    if (data.position) {
+                        addChatMessage('Game', `${data.revealed_by} revealed ${data.position.toUpperCase()} from ${data.source}`, 'game');
+                    } else {
+                        addChatMessage('Game', `${data.revealed_by} revealed from Middle`, 'game');
+                    }
+                    break;
+                    
+                case 'reveal_match':
+                    document.getElementById('reveal-hint').textContent = "✅ Match! Keep going...";
+                    break;
+                    
+                case 'trio_complete':
+                    addChatMessage('Game', data.message, 'success');
+                    document.getElementById('reveal-hint').textContent = "🎉 TRIO!";
+                    celebrate();
+                    break;
+                    
+                case 'turn_failed':
+                    addChatMessage('Game', `❌ ${data.player} - mismatch!`, 'error');
+                    document.getElementById('reveal-hint').textContent = "❌ Mismatch! Cards returning...";
+                    // Add shake animation to revealed cards
+                    document.querySelectorAll('#reveal-sequence .playing-card').forEach(card => {
+                        card.classList.add('card-fail-anim');
+                    });
+                    break;
+                    
+                case 'turn_changed':
+                    currentPlayerName = data.current_player;
+                    if (data.current_player_id === myPlayerId) {
+                        isMyTurn = true;
+                        document.getElementById('your-hand-area').classList.add('your-turn-glow');
+                    } else {
+                        isMyTurn = false;
+                        document.getElementById('your-hand-area').classList.remove('your-turn-glow');
+                    }
+                    updateTurnBanner();
+                    document.getElementById('reveal-hint').textContent = '';
+                    // Re-render hand to update clickability
+                    if (myHandData) {
+                        renderHand(myHandData);
+                    }
+                    // Re-render other players to update button states
+                    if (Object.keys(players).length > 0) {
+                        renderOtherPlayers(Object.values(players), data.current_player_id);
+                    }
+                    // Re-render middle cards
+                    renderMiddleCards();
+                    break;
+                    
+                case 'game_over':
+                    gameState = 'finished';
+                    addChatMessage('System', data.message, 'success');
+                    document.getElementById('turn-banner').textContent = `🏆 ${data.winner} WINS!`;
+                    document.getElementById('turn-banner').className = 'turn-banner';
+                    celebrateBig();
+                    break;
+                    
+                case 'chat':
+                    addChatMessage(data.player, data.message);
+                    break;
+                    
+                case 'error':
+                    addChatMessage('Error', data.message, 'error');
+                    break;
+            }
+        }
+        
+        // Update turn banner
+        function updateTurnBanner() {
+            const banner = document.getElementById('turn-banner');
+            if (isMyTurn) {
+                banner.textContent = "🎯 YOUR TURN!";
+                banner.className = 'turn-banner';
+            } else {
+                banner.textContent = `${currentPlayerName}'s turn`;
+                banner.className = 'turn-banner other';
+            }
+        }
+        
+        // Update room state
+        function updateRoom(room) {
+            players = {};
+            room.players.forEach(p => players[p.id] = p);
+            
+            if (room.current_player) {
+                currentPlayerName = room.current_player;
+            }
+            
+            const playersList = document.getElementById('players-list');
+            playersList.innerHTML = room.players.map(p => `
+                <div class="p-2 rounded-lg ${p.id === myPlayerId ? 'bg-yellow-500/20 border border-yellow-500/50' : 'bg-white/5'} ${p.id === room.current_player_id ? 'ring-2 ring-yellow-400' : ''}">
+                    <div class="flex items-center justify-between">
+                        <span class="text-white font-semibold">${p.name}${p.id === myPlayerId ? ' (you)' : ''}</span>
+                        <span class="text-white/50 text-xs">${p.card_count} cards</span>
+                    </div>
+                    ${p.trios && p.trios.length > 0 ? `
+                        <div class="flex gap-1 mt-1 flex-wrap">
+                            ${p.trios.map(trio => `
+                                <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold">
+                                    ${trio[0]}×3
+                                </span>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `).join('');
+            
+            if (room.state === 'waiting' && room.player_count >= room.min_players) {
+                document.getElementById('start-game-container').classList.remove('hidden');
+            }
+            
+            currentMode = room.mode;
+            updateModeUI();
+        }
+        
+        // Update game state
+        function updateGameState(data) {
+            data.players.forEach(p => players[p.id] = p);
+            
+            middleCards = data.middle_cards;
+            renderMiddleCards();
+            
+            revealedCards = data.revealed_this_turn;
+            renderRevealedCards();
+            
+            renderOtherPlayers(data.players, data.current_player_id);
+            
+            if (data.current_player) {
+                currentPlayerName = data.current_player;
+                updateTurnBanner();
+            }
+            
+            updateRoom({
+                players: data.players,
+                current_player_id: data.current_player_id,
+                current_player: data.current_player,
+                state: 'playing',
+                mode: currentMode,
+                min_players: 3
+            });
+            
+            document.getElementById('middle-count').textContent = `(${data.middle_card_count} face-down)`;
+        }
+        
+        // Render card HTML
+        function renderCard(cardData, extraClass = '', clickHandler = '') {
+            const suit = getCardSuit(cardData.id);
+            const color = getCardColor(cardData.id);
+            return `
+                <div class="playing-card ${color} ${extraClass}" ${clickHandler}>
+                    <span class="number">${cardData.number}</span>
+                    <span class="suit">${suit}</span>
+                </div>
+            `;
+        }
+        
+        // Render middle cards
+        function renderMiddleCards() {
+            const container = document.getElementById('middle-cards');
+            
+            if (middleCards.length === 0) {
+                container.innerHTML = '<p class="text-white/30">No cards in middle</p>';
+                return;
+            }
+            
+            container.innerHTML = middleCards.map(card => {
+                if (card.taken) {
+                    // Empty space where card was taken for a trio
+                    return `
+                        <div class="playing-card empty-space" style="cursor: default; opacity: 0.2; border: 2px dashed rgba(255,255,255,0.2);">
+                        </div>
+                    `;
+                } else if (card.face_up) {
+                    return `
+                        <div class="playing-card ${getCardColor(card.id)} revealed disabled">
+                            <span class="number">${card.number}</span>
+                            <span class="suit">${getCardSuit(card.id)}</span>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="playing-card face-down ${!isMyTurn ? 'disabled' : ''}"
+                             onclick="revealMiddle(${card.id})">
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+        
+        // Render revealed cards
+        function renderRevealedCards() {
+            const container = document.getElementById('reveal-sequence');
+            
+            if (revealedCards.length === 0) {
+                container.innerHTML = '<p class="text-white/30">Revealed cards appear here</p>';
+                return;
+            }
+            
+            container.innerHTML = revealedCards.map((r, i) => `
+                <div class="text-center card-reveal-anim">
+                    <div class="playing-card ${getCardColor(r.card.id)} revealed" style="cursor: default;">
+                        <span class="number">${r.card.number}</span>
+                        <span class="suit">${getCardSuit(r.card.id)}</span>
+                    </div>
+                    <p class="text-white/50 text-xs mt-1">${r.source}${r.position ? ` (${r.position})` : ''}</p>
+                </div>
+            `).join('');
+        }
+        
+        // Render other players
+        function renderOtherPlayers(playersList, currentPlayerId) {
+            const container = document.getElementById('other-players-reveal');
+            const allPlayers = playersList.filter(p => p.card_count > 0);
+            
+            if (allPlayers.length === 0) {
+                container.innerHTML = '<p class="text-white/30">No players with cards</p>';
+                return;
+            }
+            
+            container.innerHTML = allPlayers.map(p => `
+                <div class="p-3 rounded-xl bg-white/5 text-center ${p.id === myPlayerId ? 'border border-yellow-500/30' : ''}">
+                    <p class="text-white font-semibold text-sm mb-2">${p.name}${p.id === myPlayerId ? ' (you)' : ''}</p>
+                    <div class="flex gap-1 justify-center mb-2">
+                        ${Array(Math.min(p.card_count, 5)).fill(0).map(() => `
+                            <div class="playing-card small face-down" style="cursor: default;"></div>
+                        `).join('')}
+                        ${p.card_count > 5 ? `<span class="text-white/50 text-xs self-center">+${p.card_count - 5}</span>` : ''}
+                    </div>
+                    <div class="flex gap-2 justify-center">
+                        <button class="player-action-btn low" 
+                                onclick="revealFromPlayer('${p.id}', 'lowest')"
+                                ${!isMyTurn ? 'disabled' : ''}>
+                            ⬇️ LOW
+                        </button>
+                        <button class="player-action-btn high"
+                                onclick="revealFromPlayer('${p.id}', 'highest')"
+                                ${!isMyTurn ? 'disabled' : ''}>
+                            ⬆️ HIGH
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Render your hand
+        function renderHand(handData) {
+            const container = document.getElementById('your-hand');
+            const cards = handData.hand;
+            
+            if (cards.length === 0) {
+                container.innerHTML = '<p class="text-white/30">No cards in hand</p>';
+                return;
+            }
+            
+            container.innerHTML = cards.map((card, i) => {
+                const isLow = i === 0;
+                const isHigh = i === cards.length - 1;
+                const isOnlyCard = cards.length === 1;
+                const isClickable = isMyTurn && (isLow || isHigh);
+                
+                // For single card, clicking reveals it as "lowest"
+                let clickHandler = '';
+                if (isClickable) {
+                    if (isOnlyCard) {
+                        clickHandler = `onclick="revealOwnCard('lowest')"`;
+                    } else if (isLow) {
+                        clickHandler = `onclick="revealOwnCard('lowest')"`;
+                    } else if (isHigh) {
+                        clickHandler = `onclick="revealOwnCard('highest')"`;
+                    }
+                }
+                
+                return `
+                    <div class="playing-card ${getCardColor(card.id)} ${isClickable ? 'clickable-card' : ''}" 
+                         style="cursor: ${isClickable ? 'pointer' : 'default'};"
+                         ${clickHandler}>
+                        <span class="number">${card.number}</span>
+                        <span class="suit">${getCardSuit(card.id)}</span>
+                        ${isLow ? '<span class="card-label low">LOW</span>' : ''}
+                        ${isHigh && !isOnlyCard ? '<span class="card-label high">HIGH</span>' : ''}
+                        ${isOnlyCard ? '' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        // Reveal your own card
+        function revealOwnCard(position) {
+            if (!isMyTurn) return;
+            revealFromPlayer(myPlayerId, position);
+        }
+        
+        // Mode UI
+        function updateModeUI() {
+            const btnSimple = document.getElementById('btn-simple');
+            const btnSpicy = document.getElementById('btn-spicy');
+            const badge = document.getElementById('mode-badge');
+            const desc = document.getElementById('mode-description');
+            
+            if (currentMode === 'spicy') {
+                btnSimple.className = 'flex-1 py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70';
+                btnSpicy.className = 'flex-1 py-2 px-3 rounded-lg font-semibold text-sm bg-red-500 text-white';
+                badge.className = 'mode-badge mode-spicy ml-2';
+                badge.textContent = '🌶️ SPICY';
+                desc.textContent = 'Win with 2 connected trios or the 7-trio';
+            } else {
+                btnSimple.className = 'flex-1 py-2 px-3 rounded-lg font-semibold text-sm bg-indigo-500 text-white';
+                btnSpicy.className = 'flex-1 py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70';
+                badge.className = 'mode-badge mode-simple ml-2';
+                badge.textContent = 'SIMPLE';
+                desc.textContent = 'Win with 3 trios or the 7-trio';
+            }
+        }
+        
+        // Actions
+        function setMode(mode) {
+            ws.send(JSON.stringify({ action: 'set_mode', mode: mode }));
+        }
+        
+        function startGame() {
+            ws.send(JSON.stringify({ action: 'start_game' }));
+        }
+        
+        function revealMiddle(cardId) {
+            if (!isMyTurn) return;
+            ws.send(JSON.stringify({ action: 'reveal_middle', card_id: cardId }));
+        }
+        
+        function revealFromPlayer(targetId, position) {
+            if (!isMyTurn) return;
+            ws.send(JSON.stringify({ 
+                action: 'reveal_player', 
+                target_player_id: targetId,
+                position: position
+            }));
+        }
+        
+        // Chat
+        document.getElementById('chat-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            const message = input.value.trim();
+            if (message) {
+                ws.send(JSON.stringify({ action: 'chat', message: message }));
+                input.value = '';
+            }
+        });
+        
+        function addChatMessage(sender, message, type = 'normal') {
+            const container = document.getElementById('chat-messages');
+            const colors = {
+                system: 'text-yellow-400',
+                error: 'text-red-400',
+                game: 'text-cyan-400',
+                success: 'text-green-400',
+                normal: 'text-white/80'
+            };
+            
+            container.innerHTML += `
+                <div class="${colors[type] || colors.normal}">
+                    <span class="font-semibold">${sender}:</span> ${message}
+                </div>
+            `;
+            container.scrollTop = container.scrollHeight;
+        }
+        
+        function copyRoomCode() {
+            navigator.clipboard.writeText(roomId);
+            addChatMessage('System', 'Room code copied!', 'system');
+        }
+        
+        function celebrate() {
+            const container = document.getElementById('confetti-container');
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.textContent = ['🎉', '⭐', '✨'][Math.floor(Math.random() * 3)];
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    container.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 3000);
+                }, i * 30);
+            }
+        }
+        
+        function celebrateBig() {
+            const container = document.getElementById('confetti-container');
+            const symbols = ['🏆', '🎉', '⭐', '✨', '🃏', '7️⃣'];
+            for (let i = 0; i < 50; i++) {
+                setTimeout(() => {
+                    const confetti = document.createElement('div');
+                    confetti.className = 'confetti';
+                    confetti.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                    confetti.style.left = Math.random() * 100 + 'vw';
+                    confetti.style.fontSize = (1.5 + Math.random()) + 'rem';
+                    container.appendChild(confetti);
+                    setTimeout(() => confetti.remove(), 4000);
+                }, i * 40);
+            }
+        }
+        
+        // Start
+        connect();
+    </script>
+</body>
+</html>

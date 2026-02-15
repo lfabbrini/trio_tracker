@@ -288,13 +288,25 @@
                     <p class="text-slate-400 text-sm tracking-widest uppercase">Break Time Champions</p>
                 </div>
             </div>
-            
-            <!-- Fun card suits animation -->
-            <div class="card-suits" onclick="shuffleCards()" title="Click to shuffle!">
-                <span class="card-suit spade">♠</span>
-                <span class="card-suit heart">♥</span>
-                <span class="card-suit club">♣</span>
-                <span class="card-suit diamond">♦</span>
+
+            <div class="flex items-center gap-4">
+                <!-- Play Online Button -->
+                <a href="/game" 
+                   class="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl font-bold
+                          bg-gradient-to-r from-emerald-500 to-green-600 
+                          text-white shadow-lg shadow-emerald-500/30
+                          hover:shadow-emerald-500/50 hover:scale-105
+                          transition-all duration-200">
+                    🎮 Play Online
+                </a>
+                
+                <!-- Fun card suits animation -->
+                <div class="card-suits" onclick="shuffleCards()" title="Click to shuffle!">
+                    <span class="card-suit spade">♠</span>
+                    <span class="card-suit heart">♥</span>
+                    <span class="card-suit club">♣</span>
+                    <span class="card-suit diamond">♦</span>
+                </div>
             </div>
         </div>
     </header>
