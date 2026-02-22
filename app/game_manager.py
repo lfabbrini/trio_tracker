@@ -9,7 +9,6 @@ A trio = 3 identical cards
 - Win conditions vary by mode
 """
 
-import asyncio
 import random
 import string
 from dataclasses import dataclass, field
@@ -113,6 +112,9 @@ class GameRoom:
     # Current turn state
     current_turn_index: int = 0
     revealed_this_turn: List[RevealedCard] = field(default_factory=list)
+
+    # Pending "seen" acknowledgements (set of player_ids)
+    acks_pending: set = field(default_factory=set)
     
     # Game state
     state: str = "waiting"  # waiting, playing, finished
@@ -281,13 +283,23 @@ class TrioGameManager:
         player = room.players.get(player_id)
         if player:
             player.connected = False
-            
+
             await self.broadcast(room_id, {
                 "type": "player_disconnected",
                 "player_id": player_id,
                 "player_name": player.name,
                 "room": room.to_dict()
             }, exclude={player_id})
+
+            if player_id in room.acks_pending:
+                room.acks_pending.discard(player_id)
+                await self.broadcast(room_id, {
+                    "type": "ack_update",
+                    "acks_pending": list(room.acks_pending),
+                }, exclude={player_id})
+                if not room.acks_pending:
+                    await self.return_revealed_cards(room_id)
+                    await self.next_turn(room_id)
             
             # If game hasn't started, remove player
             if room.state == "waiting":
@@ -663,29 +675,20 @@ class TrioGameManager:
             await self.next_turn(room_id)
     
     async def fail_turn(self, room_id: str):
-        """Current player's turn failed - return all revealed cards."""
+        """Current player's turn failed - wait for all players to acknowledge before hiding cards."""
         room = self.get_room(room_id)
         if not room:
             return
-        
+
         player = room.current_player
-        
-        # First, send the fail message - cards are still visible!
+        room.acks_pending = {pid for pid, p in room.players.items() if p.connected}
         await self.broadcast(room_id, {
             "type": "turn_failed",
             "player": player.name,
             "message": f"Different numbers! {player.name}'s turn ends.",
-            "delay_return": True  # Tell client to show cards before hiding
+            "acks_required": True,
+            "acks_pending": list(room.acks_pending),
         })
-        
-        # Wait 2.5 seconds so players can see the revealed cards
-        await asyncio.sleep(2.5)
-        
-        # Now return all revealed cards
-        await self.return_revealed_cards(room_id)
-        
-        # Next turn
-        await self.next_turn(room_id)
     
     async def return_revealed_cards(self, room_id: str):
         """Return all revealed cards to their sources."""
@@ -800,7 +803,21 @@ class TrioGameManager:
         })
         
         await self.send_game_state(room_id)
-    
+
+    async def handle_seen_ack(self, room_id: str, player_id: str):
+        """Handle a player's 'seen' acknowledgement after a failed turn."""
+        room = self.get_room(room_id)
+        if not room or player_id not in room.acks_pending:
+            return
+        room.acks_pending.discard(player_id)
+        await self.broadcast(room_id, {
+            "type": "ack_update",
+            "acks_pending": list(room.acks_pending),
+        })
+        if not room.acks_pending:
+            await self.return_revealed_cards(room_id)
+            await self.next_turn(room_id)
+
     async def handle_action(self, room_id: str, player_id: str, data: dict):
         """Handle incoming player action."""
         action = data.get("action")
@@ -823,6 +840,9 @@ class TrioGameManager:
             if target_id and position:
                 await self.reveal_from_player(room_id, player_id, target_id, position)
         
+        elif action == "seen_ack":
+            await self.handle_seen_ack(room_id, player_id)
+
         elif action == "chat":
             message = data.get("message", "")
             room = self.get_room(room_id)
