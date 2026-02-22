@@ -171,7 +171,11 @@ class GameRoom:
             "max_players": self.max_players,
             "min_players": self.min_players,
             "state": self.state,
-            "players": [p.to_public_dict() for p in self.players.values()],
+            "players": (
+                [self.players[pid].to_public_dict() for pid in self.player_order if pid in self.players]
+                if self.player_order else
+                [p.to_public_dict() for p in self.players.values()]
+            ),
             "current_player": self.current_player.name if self.current_player else None,
             "current_player_id": self.current_player_id,
         }
@@ -440,7 +444,7 @@ class TrioGameManager:
         
         await self.broadcast(room_id, {
             "type": "game_state",
-            "players": [p.to_public_dict() for p in room.players.values()],
+            "players": [room.players[pid].to_public_dict() for pid in room.player_order if pid in room.players],
             "middle_cards": middle_state,
             "middle_card_count": face_down_count,
             "revealed_this_turn": revealed,
