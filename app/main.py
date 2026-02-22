@@ -169,6 +169,22 @@ async def weekly_history_api(weeks: int = 8):
     return JSONResponse(content=data)
 
 
+@app.delete("/matches/last", response_class=HTMLResponse)
+async def delete_last_match(request: Request):
+    """Delete the most recently recorded match."""
+    db.delete_last_match()
+
+    return templates.TemplateResponse("partials/all_stats.html", {
+        "request": request,
+        "players": db.get_all_players(),
+        "leaderboard": db.get_leaderboard(),
+        "weekly_leaderboard": db.get_weekly_leaderboard(),
+        "recent_matches": db.get_recent_matches(),
+        "win_streaks": db.get_win_streaks(),
+        "podium_days": db.get_podium_days(),
+    })
+
+
 @app.post("/matches", response_class=HTMLResponse)
 async def record_match(
     request: Request,

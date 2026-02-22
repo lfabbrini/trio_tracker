@@ -270,6 +270,25 @@
         .success-pulse {
             animation: successPulse 0.6s ease-out;
         }
+
+        @keyframes confettiRise {
+            0%   { transform: translateY(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-110vh) rotate(-720deg); opacity: 0; }
+        }
+        .anti-confetti {
+            position: fixed !important;
+            bottom: -2rem;
+            top: auto !important;
+            animation: confettiRise var(--rise-duration, 2s) ease-out forwards !important;
+        }
+        @keyframes undoPulse {
+            0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70%  { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .undo-pulse {
+            animation: undoPulse 0.6s ease-out;
+        }
     </style>
 </head>
 <body class="table-texture min-h-screen">
@@ -413,17 +432,46 @@
             }
         });
         
-        // Celebrate on successful match recording!
+        // Anti-celebration for undo
+        function uncelebrate() {
+            const container = document.getElementById('confetti-container');
+            const symbols = ['😬','♠', '♥', '♣', '♦'];
+            const colors = ['#FFD700', '#EF4444', '#10B981', '#3B82F6'];
+            
+
+            for (let i = 0; i < 20; i++) {
+                setTimeout(() => {
+                    const piece = document.createElement('div');
+                    piece.className = 'confetti anti-confetti';
+                    piece.textContent = symbols[Math.floor(Math.random() * symbols.length)];
+                    piece.style.left = Math.random() * 100 + 'vw';
+                    piece.style.color = colors[Math.floor(Math.random() * colors.length)];
+                    piece.style.setProperty('--rise-duration', (1.5 + Math.random() * 1.5) + 's');
+                    container.appendChild(piece);
+                    setTimeout(() => piece.remove(), 3500);
+                }, i * 60);
+            }
+
+            const leaderboard = document.getElementById('leaderboard');
+            if (leaderboard) {
+                leaderboard.classList.add('undo-pulse');
+                setTimeout(() => leaderboard.classList.remove('undo-pulse'), 600);
+            }
+        }
+
+        // Celebrate on successful match recording, or anti-celebrate on undo!
         document.body.addEventListener('htmx:afterSwap', function(evt) {
-            // Check if this was a match recording (target is match-form)
             if (evt.detail.target && evt.detail.target.id === 'match-form') {
-                celebrate();
-                
-                // Add pulse effect to leaderboard
-                const leaderboard = document.getElementById('leaderboard');
-                if (leaderboard) {
-                    leaderboard.classList.add('success-pulse');
-                    setTimeout(() => leaderboard.classList.remove('success-pulse'), 600);
+                const verb = evt.detail.requestConfig && evt.detail.requestConfig.verb;
+                if (verb === 'delete') {
+                    uncelebrate();
+                } else {
+                    celebrate();
+                    const leaderboard = document.getElementById('leaderboard');
+                    if (leaderboard) {
+                        leaderboard.classList.add('success-pulse');
+                        setTimeout(() => leaderboard.classList.remove('success-pulse'), 600);
+                    }
                 }
             }
         });

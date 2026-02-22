@@ -121,6 +121,21 @@ def record_match(winner_id: int, participant_ids: list[int]) -> dict:
         return {"id": match_id, "winner_id": winner_id, "participants": participant_ids}
 
 
+def delete_last_match() -> dict | None:
+    """Delete the most recently recorded match. Returns deleted match info or None."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        match = cursor.execute(
+            "SELECT id, winner_id, played_at FROM matches ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+        if not match:
+            return None
+        cursor.execute("DELETE FROM matches WHERE id = ?", (match["id"],))
+        conn.commit()
+        # match_players rows are deleted via ON DELETE CASCADE
+        return {"id": match["id"], "winner_id": match["winner_id"]}
+
+
 def get_leaderboard():
     """Get player stats for leaderboard."""
     with get_connection() as conn:

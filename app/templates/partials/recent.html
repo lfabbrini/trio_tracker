@@ -1,5 +1,5 @@
 {% if recent_matches %}
-<div class="space-y-2 max-h-64 overflow-y-auto pr-2">
+<div class="space-y-2 max-h-64 overflow-y-auto pr-2 mb-3">
     {% for match in recent_matches %}
     <div class="match-item flex items-center gap-3 p-3 rounded-lg border border-slate-700/50">
         
@@ -27,6 +27,16 @@
         </div>
     </div>
     {% endfor %}
+</div>
+<div class="flex justify-end">
+  <button
+    hx-delete="/matches/last"
+    hx-target="#match-form"
+    hx-swap="innerHTML"
+    hx-confirm="Undo the last recorded match?"
+    class="btn btn-sm btn-error btn-outline opacity-60 hover:opacity-100 transition-opacity">
+    ↩ Undo Last Match
+  </button>
 </div>
 {% else %}
 <div class="text-center py-8 text-slate-400">
