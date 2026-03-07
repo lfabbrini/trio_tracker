@@ -900,10 +900,15 @@
 
             let html = '';
 
-            // Show revealed cards first (face-up, non-interactive)
-            myRevealed.forEach(r => {
+            // Split revealed cards by position
+            const lowestRevealed = myRevealed.filter(r => r.position === 'lowest').sort((a, b) => a.card.number - b.card.number);
+            const highestRevealed = myRevealed.filter(r => r.position === 'highest').sort((a, b) => a.card.number - b.card.number);
+            const otherRevealed = myRevealed.filter(r => r.position !== 'lowest' && r.position !== 'highest');
+
+            // Helper to render a revealed card
+            const renderRevealed = (r) => {
                 const isNew = !previousRevealedIds.has(r.card.id);
-                html += `
+                return `
                     <div class="text-center">
                         <div class="playing-card ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
                              data-revealed-card="true" style="cursor: default;">
@@ -913,7 +918,12 @@
                         <p class="text-yellow-400/70 text-[0.6rem] font-bold mt-0.5">REVEALED</p>
                     </div>
                 `;
-            });
+            };
+
+            // Lowest revealed cards first (leftmost)
+            lowestRevealed.forEach(r => { html += renderRevealed(r); });
+            // Other revealed cards (no specific position)
+            otherRevealed.forEach(r => { html += renderRevealed(r); });
 
             // Then remaining hand cards
             html += cards.map((card, i) => {
@@ -944,6 +954,9 @@
                     </div>
                 `;
             }).join('');
+
+            // Highest revealed cards last (rightmost)
+            highestRevealed.forEach(r => { html += renderRevealed(r); });
 
             container.innerHTML = html;
         }
