@@ -213,9 +213,18 @@
             50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
         }
         
-        /* Reveal hint toast */
-        .reveal-hint-toast {
-            transition: opacity 0.3s, transform 0.3s;
+        /* Event status badge in header */
+        .event-status-match {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: white;
+        }
+        .event-status-trio {
+            background: linear-gradient(135deg, #d97706, #fbbf24);
+            color: #1f2937;
+        }
+        .event-status-mismatch {
+            background: linear-gradient(135deg, #dc2626, #ef4444);
+            color: white;
         }
 
         /* Mode badges */
@@ -303,7 +312,11 @@
                 </p>
             </div>
         </div>
-        
+
+        <!-- Event Status (inline between room info and turn banner) -->
+        <div id="event-status" class="hidden px-4 py-2 rounded-full font-bold text-sm shadow-lg transition-all duration-300">
+        </div>
+
         <!-- Turn Indicator (top right) -->
         <div id="turn-banner" class="turn-banner other">
             Waiting...
@@ -368,10 +381,6 @@
         <!-- Center/Right: Game Area -->
         <div class="lg:col-span-3 space-y-4">
             
-            <!-- Reveal hint toast (floating) -->
-            <div id="reveal-hint-toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2
-                 px-6 py-3 rounded-2xl font-bold text-lg z-50 shadow-2xl reveal-hint-toast"></div>
-
             <!-- Middle Cards -->
             <div id="middle-area" class="card-glow rounded-xl p-4">
                 <h3 class="text-white/70 text-sm mb-3">
@@ -562,6 +571,7 @@
                     
                 case 'turn_failed':
                     addChatMessage('Game', `❌ ${data.player} - mismatch!`, 'error');
+                    showRevealHint('mismatch');
                     // Red flash on game area + shake on revealed cards
                     const mainEl = document.querySelector('main');
                     mainEl.classList.remove('mismatch-flash');
@@ -999,6 +1009,7 @@
 
         function startAckTimer() {
             clearAckTimer();
+            ackCountdown = 10;
             ackDeadline = Date.now() + ackCountdown * 1000;
             ackTimer = setInterval(() => {
                 const remaining = Math.ceil((ackDeadline - Date.now()) / 1000);
@@ -1026,23 +1037,24 @@
         }
 
         function showRevealHint(type) {
-            const toast = document.getElementById('reveal-hint-toast');
-            toast.classList.remove('hidden');
+            const el = document.getElementById('event-status');
+            el.classList.remove('hidden', 'event-status-match', 'event-status-trio', 'event-status-mismatch');
             if (type === 'match') {
-                toast.textContent = '✅ Match! Keep going...';
-                toast.style.background = 'linear-gradient(135deg, #059669, #10b981)';
-                toast.style.color = 'white';
-                setTimeout(() => toast.classList.add('hidden'), 2000);
+                el.textContent = '✅ Match! Keep going...';
+                el.classList.add('event-status-match');
             } else if (type === 'trio') {
-                toast.textContent = '🎉 TRIO!';
-                toast.style.background = 'linear-gradient(135deg, #d97706, #fbbf24)';
-                toast.style.color = '#1f2937';
-                setTimeout(() => toast.classList.add('hidden'), 3000);
+                el.textContent = '🎉 TRIO!';
+                el.classList.add('event-status-trio');
+            } else if (type === 'mismatch') {
+                el.textContent = '❌ Mismatch!';
+                el.classList.add('event-status-mismatch');
             }
         }
 
         function hideRevealHint() {
-            document.getElementById('reveal-hint-toast').classList.add('hidden');
+            const el = document.getElementById('event-status');
+            el.classList.add('hidden');
+            el.classList.remove('event-status-match', 'event-status-trio', 'event-status-mismatch');
         }
 
         function celebrate() {
