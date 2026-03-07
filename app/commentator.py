@@ -15,15 +15,16 @@ COMMENTATOR_MODE = os.getenv("COMMENTATOR_MODE", "cloud")  # "cloud" or "local"
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "gemma2:2b")
 
-SYSTEM_PROMPT = """You are a sarcastic Italian sports commentator for a card game called Trio.
-Rules:
-- Keep it to 1-2 sentences MAX
-- Be witty, sarcastic, and slightly roast the players
-- Reference the specific game events or stats you're given
-- Use occasional Italian exclamations (Mamma mia!, Madonna!, Che disastro!, Incredibile!)
-- Never be mean-spirited or offensive, keep it fun and playful
-- If commenting on stats, focus on rivalries, streaks, and dramatic narratives
-- You are watching this unfold live, react with energy"""
+SYSTEM_PROMPT = """Sei un commentatore sportivo italiano sarcastico per un gioco di carte chiamato Trio.
+Regole:
+- Rispondi SEMPRE e SOLO in italiano, senza eccezioni
+- Massimo 1-2 frasi
+- Sii arguto, sarcastico e prendi bonariamente in giro i giocatori
+- Fai riferimento agli eventi specifici o alle statistiche che ti vengono fornite
+- Usa esclamazioni italiane tipiche (Mamma mia!, Madonna!, Che disastro!, Incredibile!, Porco cane!)
+- Non essere mai offensivo o meschino, mantieni un tono giocoso e divertente
+- Se commenti le statistiche, concentrati su rivalità, serie di vittorie e narrazioni drammatiche
+- Stai seguendo la partita in diretta, reagisci con energia"""
 
 
 async def get_commentary(context: str) -> str:
@@ -103,31 +104,31 @@ def _build_stats_context(stats: dict) -> str:
     """Build a context string from leaderboard data."""
     players = stats.get("players", [])
     if not players:
-        return "The leaderboard is empty — nobody has played yet!"
+        return "La classifica è vuota — nessuno ha ancora giocato!"
 
     lines = []
     for i, player in enumerate(players):
         rank = i + 1
         streak = player.get("streak", 0)
-        streak_str = f", current streak: {streak}" if streak >= 2 else ""
+        streak_str = f", serie attuale: {streak}" if streak >= 2 else ""
         lines.append(
-            f"#{rank} {player['name']}: {player['wins']} wins, "
-            f"{player['win_rate']}% win rate{streak_str}"
+            f"#{rank} {player['name']}: {player['wins']} vittorie, "
+            f"{player['win_rate']}% percentuale vittorie{streak_str}"
         )
-    return "Current leaderboard:\n" + "\n".join(lines)
+    return "Classifica attuale:\n" + "\n".join(lines)
 
 
 def _build_game_context(event_type: str, details: dict) -> str:
     """Build a context string from a game event."""
     templates = {
-        "game_start": "A new game of Trio is starting! Players: {players}",
-        "trio_claimed": "{player} just claimed a Trio with cards: {cards}!",
-        "trio_failed": "{player} tried to claim a Trio but FAILED! The cards were: {cards}",
-        "game_won": "{player} won the game! Final scores: {scores}",
-        "win_streak": "{player} is now on a {count}-game win streak!",
+        "game_start": "Una nuova partita di Trio sta iniziando! Giocatori: {players}",
+        "trio_claimed": "{player} ha appena completato un Trio con le carte: {cards}!",
+        "trio_failed": "{player} ha tentato di completare un Trio ma ha FALLITO! Le carte erano: {cards}",
+        "game_won": "{player} ha vinto la partita! Punteggi finali: {scores}",
+        "win_streak": "{player} è ora in una serie di {count} vittorie consecutive!",
     }
-    template = templates.get(event_type, "Something happened: {event_type}")
+    template = templates.get(event_type, "È successo qualcosa: {event_type}")
     try:
         return template.format(**details, event_type=event_type)
     except KeyError:
-        return f"Game event: {event_type} — {details}"
+        return f"Evento di gioco: {event_type} — {details}"
