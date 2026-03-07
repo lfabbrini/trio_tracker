@@ -223,15 +223,32 @@ async def record_match(
 
     db.record_match(winner_id, participants)
 
+    leaderboard = db.get_leaderboard()
+    win_streaks = db.get_win_streaks()
+
+    # Generate commentary for the match event
+    winner = next((p for p in leaderboard if p["id"] == winner_id), None)
+    stats_for_commentary = {
+        "players": [
+            {**p, "streak": next((s["streak"] for s in win_streaks if s["name"] == p["name"]), 0)}
+            for p in leaderboard
+        ]
+    }
+    try:
+        commentary = await asyncio.wait_for(comment_on_stats(stats_for_commentary), timeout=8.0)
+    except Exception:
+        commentary = ""
+
     # Return all updated sections
     return templates.TemplateResponse("partials/all_stats.html", {
         "request": request,
         "players": db.get_all_players(),
-        "leaderboard": db.get_leaderboard(),
+        "leaderboard": leaderboard,
         "weekly_leaderboard": db.get_weekly_leaderboard(),
         "recent_matches": db.get_recent_matches(),
-        "win_streaks": db.get_win_streaks(),
+        "win_streaks": win_streaks,
         "podium_days": db.get_podium_days(),
+        "commentary": commentary,
     })
 
 

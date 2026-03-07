@@ -21,3 +21,10 @@
 <div id="podium-days" hx-swap-oob="true">
     {% include "partials/podium_days.html" %}
 </div>
+
+{% if commentary %}
+<div id="commentator-panel" hx-swap-oob="true" class="commentator-panel">
+    <div class="commentator-icon">🎙️</div>
+    <div id="commentator-text" class="commentator-text new-comment">{{ commentary }}</div>
+</div>
+{% endif %}
