@@ -213,20 +213,11 @@
             50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
         }
         
-        /* Reveal sequence */
-        .reveal-sequence {
-            display: flex;
-            gap: 1rem;
-            padding: 1.5rem;
-            background: rgba(251, 191, 36, 0.1);
-            border: 2px dashed rgba(251, 191, 36, 0.5);
-            border-radius: 1rem;
-            min-height: 130px;
-            align-items: center;
-            justify-content: center;
-            flex-wrap: wrap;
+        /* Reveal hint toast */
+        .reveal-hint-toast {
+            transition: opacity 0.3s, transform 0.3s;
         }
-        
+
         /* Mode badges */
         .mode-badge {
             padding: 0.25rem 0.75rem;
@@ -257,6 +248,15 @@
         .card-fail-anim {
             animation: cardFail 0.5s ease-out;
             border-color: #ef4444 !important;
+        }
+
+        @keyframes mismatchFlash {
+            0% { box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0); }
+            30% { box-shadow: inset 0 0 60px 10px rgba(239, 68, 68, 0.3); }
+            100% { box-shadow: inset 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .mismatch-flash {
+            animation: mismatchFlash 0.8s ease-out;
         }
         
         /* Confetti */
@@ -368,17 +368,10 @@
         <!-- Center/Right: Game Area -->
         <div class="lg:col-span-3 space-y-4">
             
-            <!-- Current Reveal Sequence -->
-            <div id="reveal-area" class="card-glow rounded-xl p-4">
-                <h3 class="text-white/70 text-sm mb-2">
-                    🎯 Current Reveal
-                    <span id="reveal-hint" class="text-yellow-400 ml-2"></span>
-                </h3>
-                <div id="reveal-sequence" class="reveal-sequence">
-                    <p class="text-white/30">Revealed cards appear here</p>
-                </div>
-            </div>
-            
+            <!-- Reveal hint toast (floating) -->
+            <div id="reveal-hint-toast" class="hidden fixed top-20 left-1/2 -translate-x-1/2
+                 px-6 py-3 rounded-2xl font-bold text-lg z-50 shadow-2xl reveal-hint-toast"></div>
+
             <!-- Middle Cards -->
             <div id="middle-area" class="card-glow rounded-xl p-4">
                 <h3 class="text-white/70 text-sm mb-3">
@@ -453,6 +446,9 @@
         let acksRequired = false;
         let acksPending = [];
         let myAckDone = false;
+        let previousRevealedIds = new Set();
+        let ackTimer = null;
+        let ackCountdown = 10;
         
         // Connect to WebSocket
         function connect() {
@@ -547,19 +543,31 @@
                     break;
                     
                 case 'reveal_match':
-                    document.getElementById('reveal-hint').textContent = "✅ Match! Keep going...";
+                    showRevealHint('match');
                     break;
                     
                 case 'trio_complete':
                     addChatMessage('Game', data.message, 'success');
-                    document.getElementById('reveal-hint').textContent = "🎉 TRIO!";
+                    showRevealHint('trio');
                     celebrate();
+                    if (data.acks_required) {
+                        acksRequired = true;
+                        acksPending = data.acks_pending;
+                        myAckDone = false;
+                        renderAckPanel();
+                        startAckTimer();
+                    }
                     break;
                     
                 case 'turn_failed':
                     addChatMessage('Game', `❌ ${data.player} - mismatch!`, 'error');
-                    document.getElementById('reveal-hint').textContent = "❌ Mismatch!";
-                    document.querySelectorAll('#reveal-sequence .playing-card').forEach(card => {
+                    // Red flash on game area + shake on revealed cards
+                    const mainEl = document.querySelector('main');
+                    mainEl.classList.remove('mismatch-flash');
+                    void mainEl.offsetWidth; // force reflow to restart animation
+                    mainEl.classList.add('mismatch-flash');
+                    mainEl.addEventListener('animationend', () => mainEl.classList.remove('mismatch-flash'), { once: true });
+                    document.querySelectorAll('[data-revealed-card]').forEach(card => {
                         card.classList.add('card-fail-anim');
                     });
                     if (data.acks_required) {
@@ -567,6 +575,7 @@
                         acksPending = data.acks_pending;
                         myAckDone = false;
                         renderAckPanel();
+                        startAckTimer();
                     }
                     break;
                     
@@ -575,6 +584,7 @@
                     if (acksPending.length === 0) {
                         acksRequired = false;
                         myAckDone = false;
+                        clearAckTimer();
                         document.getElementById('ack-panel').classList.add('hidden');
                     } else {
                         renderAckPanel();
@@ -584,6 +594,7 @@
                 case 'turn_changed':
                     acksRequired = false;
                     myAckDone = false;
+                    clearAckTimer();
                     document.getElementById('ack-panel').classList.add('hidden');
                     currentPlayerName = data.current_player;
                     if (data.current_player_id === myPlayerId) {
@@ -594,7 +605,8 @@
                         document.getElementById('your-hand-area').classList.remove('your-turn-glow');
                     }
                     updateTurnBanner();
-                    document.getElementById('reveal-hint').textContent = '';
+                    hideRevealHint();
+                    previousRevealedIds = new Set();
                     // Re-render hand to update clickability
                     if (myHandData) {
                         renderHand(myHandData);
@@ -676,14 +688,17 @@
         // Update game state
         function updateGameState(data) {
             data.players.forEach(p => players[p.id] = p);
-            
+
             middleCards = data.middle_cards;
-            renderMiddleCards();
-            
             revealedCards = data.revealed_this_turn;
-            renderRevealedCards();
-            
+            renderMiddleCards();
             renderOtherPlayers(data.players, data.current_player_id);
+            // Re-render hand to show own revealed cards
+            if (myHandData) {
+                renderHand(myHandData);
+            }
+            // Track revealed IDs so we don't re-animate on next state update
+            previousRevealedIds = new Set(revealedCards.map(r => r.card.id));
             
             if (data.current_player) {
                 currentPlayerName = data.current_player;
@@ -725,14 +740,16 @@
             
             container.innerHTML = middleCards.map(card => {
                 if (card.taken) {
-                    // Empty space where card was taken for a trio
                     return `
                         <div class="playing-card empty-space" style="cursor: default; opacity: 0.2; border: 2px dashed rgba(255,255,255,0.2);">
                         </div>
                     `;
                 } else if (card.face_up) {
+                    const isRevealed = revealedCards.some(r => r.source_id === 'middle' && r.card.id === card.id);
+                    const isNew = isRevealed && !previousRevealedIds.has(card.id);
                     return `
-                        <div class="playing-card ${getCardColor(card.id)} revealed disabled">
+                        <div class="playing-card ${getCardColor(card.id)} revealed disabled ${isNew ? 'card-reveal-anim' : ''}"
+                             ${isRevealed ? 'data-revealed-card="true"' : ''}>
                             <span class="number">${card.number}</span>
                             <span class="suit">${getCardSuit(card.id)}</span>
                         </div>
@@ -747,78 +764,108 @@
             }).join('');
         }
         
-        // Render revealed cards
-        function renderRevealedCards() {
-            const container = document.getElementById('reveal-sequence');
-            
-            if (revealedCards.length === 0) {
-                container.innerHTML = '<p class="text-white/30">Revealed cards appear here</p>';
-                return;
-            }
-            
-            container.innerHTML = revealedCards.map((r, i) => `
-                <div class="text-center card-reveal-anim">
-                    <div class="playing-card ${getCardColor(r.card.id)} revealed" style="cursor: default;">
-                        <span class="number">${r.card.number}</span>
-                        <span class="suit">${getCardSuit(r.card.id)}</span>
-                    </div>
-                    <p class="text-white/50 text-xs mt-1">${r.source}${r.position ? ` (${r.position})` : ''}</p>
-                </div>
-            `).join('');
-        }
-        
         // Render other players
         function renderOtherPlayers(playersList, currentPlayerId) {
             const container = document.getElementById('other-players-reveal');
-            const allPlayers = playersList.filter(p => p.card_count > 0);
-            
+            // Show players that have cards OR have revealed cards this turn
+            const allPlayers = playersList.filter(p => {
+                if (p.card_count > 0) return true;
+                return revealedCards.some(r => r.source_id === p.id);
+            });
+
             if (allPlayers.length === 0) {
                 container.innerHTML = '<p class="text-white/30">No players with cards</p>';
                 return;
             }
-            
-            container.innerHTML = allPlayers.map(p => `
+
+            container.innerHTML = allPlayers.map(p => {
+                const playerRevealed = revealedCards.filter(r => r.source_id === p.id);
+                const hasCards = p.card_count > 0;
+
+                return `
                 <div class="p-3 rounded-xl bg-white/5 text-center ${p.id === myPlayerId ? 'border border-yellow-500/30' : ''}">
                     <p class="text-white font-semibold text-sm mb-2">${p.name}${p.id === myPlayerId ? ' (you)' : ''}</p>
-                    <div class="flex gap-1 justify-center mb-2">
-                        ${Array(Math.min(p.card_count, 5)).fill(0).map(() => `
-                            <div class="playing-card small face-down" style="cursor: default;"></div>
-                        `).join('')}
-                        ${p.card_count > 5 ? `<span class="text-white/50 text-xs self-center">+${p.card_count - 5}</span>` : ''}
+                    <div class="flex gap-1 justify-center mb-2 flex-wrap">
+                        ${(() => {
+                            const totalCards = playerRevealed.length + p.card_count;
+                            const maxSlots = 5;
+                            const faceDownSlots = Math.max(0, Math.min(p.card_count, maxSlots - playerRevealed.length));
+                            const overflow = totalCards - Math.min(totalCards, maxSlots);
+                            let html = '';
+                            playerRevealed.forEach(r => {
+                                const isNew = !previousRevealedIds.has(r.card.id);
+                                html += `
+                                <div class="text-center">
+                                    <div class="playing-card small ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
+                                         data-revealed-card="true" style="cursor: default;">
+                                        <span class="number">${r.card.number}</span>
+                                        <span class="suit">${getCardSuit(r.card.id)}</span>
+                                    </div>
+                                    <p class="text-white/40 text-[0.6rem] mt-0.5">${r.position || ''}</p>
+                                </div>`;
+                            });
+                            for (let i = 0; i < faceDownSlots; i++) {
+                                html += `<div class="playing-card small face-down" style="cursor: default;"></div>`;
+                            }
+                            if (overflow > 0) {
+                                html += `<span class="text-white/50 text-xs self-center">+${overflow}</span>`;
+                            }
+                            return html;
+                        })()}
                     </div>
                     <div class="flex gap-2 justify-center">
-                        <button class="player-action-btn low" 
+                        <button class="player-action-btn low"
                                 onclick="revealFromPlayer('${p.id}', 'lowest')"
-                                ${!isMyTurn ? 'disabled' : ''}>
+                                ${!isMyTurn || !hasCards ? 'disabled' : ''}>
                             ⬇️ LOW
                         </button>
                         <button class="player-action-btn high"
                                 onclick="revealFromPlayer('${p.id}', 'highest')"
-                                ${!isMyTurn ? 'disabled' : ''}>
+                                ${!isMyTurn || !hasCards ? 'disabled' : ''}>
                             ⬆️ HIGH
                         </button>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
         }
         
         // Render your hand
         function renderHand(handData) {
             const container = document.getElementById('your-hand');
             const cards = handData.hand;
-            
-            if (cards.length === 0) {
+
+            // Own revealed cards this turn
+            const myRevealed = revealedCards.filter(r => r.source_id === myPlayerId);
+
+            if (cards.length === 0 && myRevealed.length === 0) {
                 container.innerHTML = '<p class="text-white/30">No cards in hand</p>';
                 return;
             }
-            
-            container.innerHTML = cards.map((card, i) => {
+
+            let html = '';
+
+            // Show revealed cards first (face-up, non-interactive)
+            myRevealed.forEach(r => {
+                const isNew = !previousRevealedIds.has(r.card.id);
+                html += `
+                    <div class="text-center">
+                        <div class="playing-card ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
+                             data-revealed-card="true" style="cursor: default;">
+                            <span class="number">${r.card.number}</span>
+                            <span class="suit">${getCardSuit(r.card.id)}</span>
+                        </div>
+                        <p class="text-yellow-400/70 text-[0.6rem] font-bold mt-0.5">REVEALED</p>
+                    </div>
+                `;
+            });
+
+            // Then remaining hand cards
+            html += cards.map((card, i) => {
                 const isLow = i === 0;
                 const isHigh = i === cards.length - 1;
                 const isOnlyCard = cards.length === 1;
                 const isClickable = isMyTurn && (isLow || isHigh);
-                
-                // For single card, clicking reveals it as "lowest"
+
                 let clickHandler = '';
                 if (isClickable) {
                     if (isOnlyCard) {
@@ -829,19 +876,20 @@
                         clickHandler = `onclick="revealOwnCard('highest')"`;
                     }
                 }
-                
+
                 return `
-                    <div class="playing-card ${getCardColor(card.id)} ${isClickable ? 'clickable-card' : ''}" 
+                    <div class="playing-card ${getCardColor(card.id)} ${isClickable ? 'clickable-card' : ''}"
                          style="cursor: ${isClickable ? 'pointer' : 'default'};"
                          ${clickHandler}>
                         <span class="number">${card.number}</span>
                         <span class="suit">${getCardSuit(card.id)}</span>
                         ${isLow ? '<span class="card-label low">LOW</span>' : ''}
                         ${isHigh && !isOnlyCard ? '<span class="card-label high">HIGH</span>' : ''}
-                        ${isOnlyCard ? '' : ''}
                     </div>
                 `;
             }).join('');
+
+            container.innerHTML = html;
         }
         
         // Reveal your own card
@@ -933,12 +981,13 @@
             const panel = document.getElementById('ack-panel');
             const waitingNames = acksPending.map(pid => players[pid]?.name || pid);
             panel.classList.remove('hidden');
+            const timerHtml = !myAckDone ? ` <span id="ack-timer" class="ml-1 font-mono">(${ackCountdown}s)</span>` : '';
             panel.innerHTML = `
                 <div class="flex items-center gap-4 flex-wrap justify-center">
                     <button onclick="sendAck()" id="seen-btn"
                         class="btn btn-success btn-sm ${myAckDone ? 'btn-disabled opacity-50' : ''}"
                         ${myAckDone ? 'disabled' : ''}>
-                        ✅ Seen!
+                        ✅ Seen!${timerHtml}
                     </button>
                     <span class="text-sm opacity-70">
                         Waiting for: ${waitingNames.join(', ')}
@@ -947,11 +996,50 @@
             `;
         }
 
+        function startAckTimer() {
+            clearAckTimer();
+            ackCountdown = 15;
+            ackTimer = setInterval(() => {
+                ackCountdown--;
+                const timerEl = document.getElementById('ack-timer');
+                if (timerEl) timerEl.textContent = `(${ackCountdown}s)`;
+                if (ackCountdown <= 0) {
+                    clearAckTimer();
+                    sendAck();
+                }
+            }, 1000);
+        }
+
+        function clearAckTimer() {
+            if (ackTimer) { clearInterval(ackTimer); ackTimer = null; }
+        }
+
         function sendAck() {
             if (myAckDone || !acksRequired) return;
             myAckDone = true;
+            clearAckTimer();
             ws.send(JSON.stringify({ action: 'seen_ack' }));
             renderAckPanel();
+        }
+
+        function showRevealHint(type) {
+            const toast = document.getElementById('reveal-hint-toast');
+            toast.classList.remove('hidden');
+            if (type === 'match') {
+                toast.textContent = '✅ Match! Keep going...';
+                toast.style.background = 'linear-gradient(135deg, #059669, #10b981)';
+                toast.style.color = 'white';
+                setTimeout(() => toast.classList.add('hidden'), 2000);
+            } else if (type === 'trio') {
+                toast.textContent = '🎉 TRIO!';
+                toast.style.background = 'linear-gradient(135deg, #d97706, #fbbf24)';
+                toast.style.color = '#1f2937';
+                setTimeout(() => toast.classList.add('hidden'), 3000);
+            }
+        }
+
+        function hideRevealHint() {
+            document.getElementById('reveal-hint-toast').classList.add('hidden');
         }
 
         function celebrate() {

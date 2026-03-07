@@ -108,6 +108,20 @@ docker-compose down
 docker-compose down -v
 ```
 
+## Rebuild After modifications
+
+```bash
+#re-build 
+docker-compose build 
+
+#re-build everithing from scratch
+docker-compose build --no-cache
+
+# Start the app
+docker-compose up -d
+
+```
+
 ## Tech Stack
 
 - **Backend**: Python 3.12 + FastAPI

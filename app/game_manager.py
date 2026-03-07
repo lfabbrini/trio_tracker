@@ -115,6 +115,9 @@ class GameRoom:
 
     # Pending "seen" acknowledgements (set of player_ids)
     acks_pending: set = field(default_factory=set)
+
+    # Pending trio data (waiting for acks before collecting)
+    pending_trio: Optional[dict] = None
     
     # Game state
     state: str = "waiting"  # waiting, playing, finished
@@ -298,8 +301,11 @@ class TrioGameManager:
                     "acks_pending": list(room.acks_pending),
                 }, exclude={player_id})
                 if not room.acks_pending:
-                    await self.return_revealed_cards(room_id)
-                    await self.next_turn(room_id)
+                    if room.pending_trio:
+                        await self.finalize_trio(room_id)
+                    else:
+                        await self.return_revealed_cards(room_id)
+                        await self.next_turn(room_id)
             
             # If game hasn't started, remove player
             if room.state == "waiting":
@@ -451,6 +457,7 @@ class TrioGameManager:
         revealed = [{
             "card": r.card.to_dict(),
             "source": r.source_name,
+            "source_id": r.source,
             "position": r.position
         } for r in room.revealed_this_turn]
         
@@ -631,47 +638,67 @@ class TrioGameManager:
         await self.send_game_state(room_id)
     
     async def complete_trio(self, room_id: str):
-        """Current player successfully completed a trio."""
+        """Current player successfully completed a trio - wait for acks before collecting."""
         room = self.get_room(room_id)
         if not room:
             return
-        
+
         player = room.current_player
         trio_cards = [r.card for r in room.revealed_this_turn[-3:]]
         trio_number = trio_cards[0].number
-        
-        # Add trio to player's collection
-        player.trios.append(trio_cards)
-        
-        # Mark trio cards as taken (but keep positions in middle)
-        for r in room.revealed_this_turn[-3:]:
-            if r.source == "middle":
-                # Mark as taken instead of removing
-                room.middle_face_up[r.card.id] = "taken"
-        
-        # Clear revealed (trio cards are collected, others were already removed from hands)
-        room.revealed_this_turn = []
-        
+
+        # Store pending trio info but DON'T collect yet
+        room.pending_trio = {
+            "player_id": player.id,
+            "cards": trio_cards,
+            "number": trio_number,
+            "revealed": room.revealed_this_turn[-3:],
+        }
+
+        # Set acks (same as fail_turn)
+        room.acks_pending = {pid for pid, p in room.players.items() if p.connected}
+
         await self.broadcast(room_id, {
             "type": "trio_complete",
             "player": player.name,
             "player_id": player.id,
             "trio_number": trio_number,
-            "message": f"🎉 {player.name} got a trio of {trio_number}s!"
+            "message": f"🎉 {player.name} got a trio of {trio_number}s!",
+            "acks_required": True,
+            "acks_pending": list(room.acks_pending),
         })
-        
+
+    async def finalize_trio(self, room_id: str):
+        """Finalize trio collection after all acks received."""
+        room = self.get_room(room_id)
+        if not room or not room.pending_trio:
+            return
+
+        pending = room.pending_trio
+        room.pending_trio = None
+        player = room.players[pending["player_id"]]
+
+        # Collect trio
+        player.trios.append(pending["cards"])
+
+        # Mark middle cards as taken
+        for r in pending["revealed"]:
+            if r.source == "middle":
+                room.middle_face_up[r.card.id] = "taken"
+
+        # Clear revealed
+        room.revealed_this_turn = []
+
         # Update all hands
         for pid, p in room.players.items():
             await self.send_to_player(room_id, pid, {
                 "type": "your_hand",
                 "hand": p.to_private_dict(),
             })
-        
+
         # Check win condition
-        win = await self.check_win_condition(room_id, player.id)
-        
+        win = await self.check_win_condition(room_id, pending["player_id"])
         if not win:
-            # Turn ends - next player!
             await self.next_turn(room_id)
     
     async def fail_turn(self, room_id: str):
@@ -805,7 +832,7 @@ class TrioGameManager:
         await self.send_game_state(room_id)
 
     async def handle_seen_ack(self, room_id: str, player_id: str):
-        """Handle a player's 'seen' acknowledgement after a failed turn."""
+        """Handle a player's 'seen' acknowledgement after a failed turn or trio."""
         room = self.get_room(room_id)
         if not room or player_id not in room.acks_pending:
             return
@@ -815,8 +842,11 @@ class TrioGameManager:
             "acks_pending": list(room.acks_pending),
         })
         if not room.acks_pending:
-            await self.return_revealed_cards(room_id)
-            await self.next_turn(room_id)
+            if room.pending_trio:
+                await self.finalize_trio(room_id)
+            else:
+                await self.return_revealed_cards(room_id)
+                await self.next_turn(room_id)
 
     async def handle_action(self, room_id: str, player_id: str, data: dict):
         """Handle incoming player action."""
