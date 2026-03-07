@@ -11,6 +11,7 @@ A trio = 3 identical cards
 
 import random
 import string
+import asyncio
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional, Set, Tuple
 from fastapi import WebSocket
@@ -412,9 +413,13 @@ class TrioGameManager:
             "type": "your_turn",
             "message": "It's your turn! Reveal cards to find a trio."
         })
-        
+
         # THEN send initial game state (buttons will now be enabled for first player)
         await self.send_game_state(room_id)
+
+        # Fire-and-forget commentary
+        player_names = ", ".join(room.players[pid].name for pid in room.player_order)
+        asyncio.create_task(_fire_commentary(self, room_id, "game_start", {"players": player_names}))
     
     async def send_game_state(self, room_id: str):
         """Send current game state to all players."""
@@ -668,6 +673,12 @@ class TrioGameManager:
             "acks_pending": list(room.acks_pending),
         })
 
+        # Fire-and-forget commentary
+        asyncio.create_task(_fire_commentary(self, room_id, "trio_claimed", {
+            "player": player.name,
+            "cards": f"{trio_number}, {trio_number}, {trio_number}",
+        }))
+
     async def finalize_trio(self, room_id: str):
         """Finalize trio collection after all acks received."""
         room = self.get_room(room_id)
@@ -709,6 +720,7 @@ class TrioGameManager:
 
         player = room.current_player
         room.acks_pending = {pid for pid, p in room.players.items() if p.connected}
+        revealed_numbers = [str(r.card.number) for r in room.revealed_this_turn]
         await self.broadcast(room_id, {
             "type": "turn_failed",
             "player": player.name,
@@ -716,6 +728,12 @@ class TrioGameManager:
             "acks_required": True,
             "acks_pending": list(room.acks_pending),
         })
+
+        # Fire-and-forget commentary
+        asyncio.create_task(_fire_commentary(self, room_id, "trio_failed", {
+            "player": player.name,
+            "cards": ", ".join(revealed_numbers),
+        }))
     
     async def return_revealed_cards(self, room_id: str):
         """Return all revealed cards to their sources."""
@@ -795,17 +813,25 @@ class TrioGameManager:
         if not room:
             return
         
+        final_scores = [
+            {"name": p.name, "trios": len(p.trios)}
+            for p in sorted(room.players.values(), key=lambda x: len(x.trios), reverse=True)
+        ]
         await self.broadcast(room_id, {
             "type": "game_over",
             "winner": player.name,
             "winner_id": player.id,
             "reason": reason,
             "message": f"🏆 {player.name} wins! {reason}",
-            "final_scores": [
-                {"name": p.name, "trios": len(p.trios)} 
-                for p in sorted(room.players.values(), key=lambda x: len(x.trios), reverse=True)
-            ]
+            "final_scores": final_scores,
         })
+
+        # Fire-and-forget commentary
+        scores_str = ", ".join(f"{s['name']}: {s['trios']} trios" for s in final_scores)
+        asyncio.create_task(_fire_commentary(self, room_id, "game_won", {
+            "player": player.name,
+            "scores": scores_str,
+        }))
     
     async def next_turn(self, room_id: str):
         """Move to the next player's turn."""
@@ -890,6 +916,17 @@ class TrioGameManager:
                         "player": player.name,
                         "message": message
                     })
+
+
+async def _fire_commentary(manager: "TrioGameManager", room_id: str, event_type: str, details: dict):
+    """Fire-and-forget commentary broadcast. Never raises."""
+    try:
+        from .commentator import comment_on_game_event
+        text = await comment_on_game_event(event_type, details)
+        if text:
+            await manager.broadcast(room_id, {"type": "commentary", "text": text})
+    except Exception:
+        pass
 
 
 # Global game manager instance

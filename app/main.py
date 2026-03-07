@@ -3,10 +3,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from typing import List
 from datetime import datetime, timezone
+import asyncio
 import os
 
 from . import database as db
 from .game_manager import game_manager
+from .commentator import comment_on_stats
 
 app = FastAPI(title="Trio Tracker", description="Track your Trio card game wins!")
 
@@ -55,13 +57,34 @@ async def startup():
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Main page."""
+    leaderboard = db.get_leaderboard()
+    win_streaks = db.get_win_streaks()
+
+    # Build stats dict for the commentator (non-blocking, fails gracefully)
+    stats_for_commentary = {
+        "players": [
+            {
+                "name": p["name"],
+                "wins": p["wins"],
+                "win_rate": p["win_rate"],
+                "streak": next((s["streak"] for s in win_streaks if s["name"] == p["name"]), 0),
+            }
+            for p in leaderboard
+        ]
+    }
+    try:
+        commentary = await asyncio.wait_for(comment_on_stats(stats_for_commentary), timeout=8.0)
+    except Exception:
+        commentary = ""
+
     return templates.TemplateResponse("index.html", {
         "request": request,
         "players": db.get_all_players(),
-        "leaderboard": db.get_leaderboard(),
+        "leaderboard": leaderboard,
         "weekly_leaderboard": db.get_weekly_leaderboard(),
         "recent_matches": db.get_recent_matches(),
         "podium_days": db.get_podium_days(),
+        "commentary": commentary,
     })
 
 

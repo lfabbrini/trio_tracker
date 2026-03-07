@@ -289,9 +289,54 @@
         .undo-pulse {
             animation: undoPulse 0.6s ease-out;
         }
+
+        /* ===== AI COMMENTATOR PANEL ===== */
+        .commentator-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #e0e0e0;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-style: italic;
+            font-size: 0.95rem;
+            z-index: 1000;
+            border-top: 2px solid #e94560;
+            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+            min-height: 50px;
+        }
+
+        .commentator-icon {
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+
+        .commentator-text {
+            flex: 1;
+            line-height: 1.4;
+        }
+
+        .commentator-text.new-comment {
+            animation: commentFadeIn 0.5s ease-out;
+        }
+
+        @keyframes commentFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
     </style>
 </head>
-<body class="table-texture min-h-screen">
+<body class="table-texture min-h-screen" style="padding-bottom: 60px;">
     <!-- Confetti container (for celebrations) -->
     <div id="confetti-container" class="confetti-container"></div>
     
@@ -336,6 +381,14 @@
             {% block content %}{% endblock %}
         </div>
     </main>
+
+    <!-- AI Commentator Panel -->
+    <div id="commentator-panel" class="commentator-panel">
+        <div class="commentator-icon">🎙️</div>
+        <div id="commentator-text" class="commentator-text">
+            {% if commentary %}{{ commentary }}{% else %}The commentator is warming up...{% endif %}
+        </div>
+    </div>
 
     <!-- Footer -->
     <footer class="relative z-10 text-center py-6 text-slate-500 text-sm">
