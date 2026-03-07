@@ -800,23 +800,68 @@
                         ${(() => {
                             const totalCards = playerRevealed.length + p.card_count;
                             const maxSlots = 5;
-                            const faceDownSlots = Math.max(0, Math.min(p.card_count, maxSlots - playerRevealed.length));
-                            const overflow = totalCards - Math.min(totalCards, maxSlots);
-                            let html = '';
-                            playerRevealed.forEach(r => {
-                                const isNew = !previousRevealedIds.has(r.card.id);
-                                html += `
-                                <div class="text-center">
-                                    <div class="playing-card small ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
-                                         data-revealed-card="true" style="cursor: default;">
-                                        <span class="number">${r.card.number}</span>
-                                        <span class="suit">${getCardSuit(r.card.id)}</span>
-                                    </div>
-                                    <p class="text-white/40 text-[0.6rem] mt-0.5">${r.position || ''}</p>
-                                </div>`;
+                            const overflow = Math.max(0, totalCards - maxSlots);
+
+                            // Build a 5-slot array: lowest cards from left, highest from right
+                            const slots = new Array(maxSlots).fill(null);
+                            const lowestCards = playerRevealed.filter(r => r.position === 'lowest');
+                            const highestCards = playerRevealed.filter(r => r.position === 'highest');
+                            const otherCards = playerRevealed.filter(r => r.position !== 'lowest' && r.position !== 'highest');
+
+                            // Place lowest cards from index 0 forward
+                            let leftIdx = 0;
+                            lowestCards.forEach(r => {
+                                if (leftIdx < maxSlots) slots[leftIdx++] = { type: 'revealed', data: r };
                             });
-                            for (let i = 0; i < faceDownSlots; i++) {
-                                html += `<div class="playing-card small face-down" style="cursor: default;"></div>`;
+
+                            // Place highest cards from index 4 backward
+                            let rightIdx = maxSlots - 1;
+                            highestCards.forEach(r => {
+                                if (rightIdx >= 0) slots[rightIdx--] = { type: 'revealed', data: r };
+                            });
+
+                            // Place other revealed cards in first available null slots from left
+                            otherCards.forEach(r => {
+                                const idx = slots.indexOf(null);
+                                if (idx !== -1) slots[idx] = { type: 'revealed', data: r };
+                            });
+
+                            // Fill remaining null slots with face-down cards (up to remaining card_count)
+                            let faceDownRemaining = p.card_count;
+                            for (let i = 0; i < maxSlots && faceDownRemaining > 0; i++) {
+                                if (slots[i] === null) {
+                                    slots[i] = { type: 'facedown' };
+                                    faceDownRemaining--;
+                                }
+                            }
+
+                            // Determine last used slot to avoid trailing empties
+                            let lastUsed = -1;
+                            for (let i = maxSlots - 1; i >= 0; i--) {
+                                if (slots[i] !== null) { lastUsed = i; break; }
+                            }
+
+                            let html = '';
+                            for (let i = 0; i <= lastUsed; i++) {
+                                const slot = slots[i];
+                                if (slot === null) {
+                                    // Empty gap between positioned cards - render invisible placeholder
+                                    html += `<div class="playing-card small" style="visibility: hidden;"></div>`;
+                                } else if (slot.type === 'revealed') {
+                                    const r = slot.data;
+                                    const isNew = !previousRevealedIds.has(r.card.id);
+                                    html += `
+                                    <div class="text-center">
+                                        <div class="playing-card small ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
+                                             data-revealed-card="true" style="cursor: default;">
+                                            <span class="number">${r.card.number}</span>
+                                            <span class="suit">${getCardSuit(r.card.id)}</span>
+                                        </div>
+                                        <p class="text-white/40 text-[0.6rem] mt-0.5">${r.position || ''}</p>
+                                    </div>`;
+                                } else {
+                                    html += `<div class="playing-card small face-down" style="cursor: default;"></div>`;
+                                }
                             }
                             if (overflow > 0) {
                                 html += `<span class="text-white/50 text-xs self-center">+${overflow}</span>`;
