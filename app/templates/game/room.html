@@ -448,6 +448,7 @@
         let myAckDone = false;
         let previousRevealedIds = new Set();
         let ackTimer = null;
+        let ackDeadline = null;
         let ackCountdown = 10;
         
         // Connect to WebSocket
@@ -998,20 +999,22 @@
 
         function startAckTimer() {
             clearAckTimer();
-            ackCountdown = 15;
+            ackDeadline = Date.now() + ackCountdown * 1000;
             ackTimer = setInterval(() => {
-                ackCountdown--;
+                const remaining = Math.ceil((ackDeadline - Date.now()) / 1000);
+                ackCountdown = Math.max(0, remaining);
                 const timerEl = document.getElementById('ack-timer');
                 if (timerEl) timerEl.textContent = `(${ackCountdown}s)`;
                 if (ackCountdown <= 0) {
                     clearAckTimer();
                     sendAck();
                 }
-            }, 1000);
+            }, 250);
         }
 
         function clearAckTimer() {
             if (ackTimer) { clearInterval(ackTimer); ackTimer = null; }
+            ackDeadline = null;
         }
 
         function sendAck() {
