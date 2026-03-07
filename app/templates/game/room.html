@@ -213,19 +213,10 @@
             50% { box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
         }
         
-        /* Event status badge in header */
-        .event-status-match {
-            background: linear-gradient(135deg, #059669, #10b981);
-            color: white;
-        }
-        .event-status-trio {
-            background: linear-gradient(135deg, #d97706, #fbbf24);
-            color: #1f2937;
-        }
-        .event-status-mismatch {
-            background: linear-gradient(135deg, #dc2626, #ef4444);
-            color: white;
-        }
+        /* Event status text in header */
+        .event-status-match   { color: #10b981; }
+        .event-status-trio    { color: #d4af37; }
+        .event-status-mismatch { color: #ef4444; }
 
         /* Mode badges */
         .mode-badge {
@@ -315,7 +306,7 @@
 
         <!-- Event Status + Seen button row -->
         <div class="flex items-center gap-2">
-            <div id="event-status" class="hidden px-3 py-1 rounded-full font-bold text-xs shadow-md transition-all duration-300"></div>
+            <div id="event-status" class="hidden font-bold text-xs transition-all duration-300"></div>
             <div id="ack-panel" class="hidden"></div>
         </div>
 
