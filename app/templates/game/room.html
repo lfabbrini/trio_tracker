@@ -846,7 +846,7 @@
         
         // Reveal your own card
         function revealOwnCard(position) {
-            if (!isMyTurn) return;
+            if (!isMyTurn || acksRequired) return;
             revealFromPlayer(myPlayerId, position);
         }
         
@@ -882,14 +882,14 @@
         }
         
         function revealMiddle(cardId) {
-            if (!isMyTurn) return;
+            if (!isMyTurn || acksRequired) return;
             ws.send(JSON.stringify({ action: 'reveal_middle', card_id: cardId }));
         }
-        
+
         function revealFromPlayer(targetId, position) {
-            if (!isMyTurn) return;
-            ws.send(JSON.stringify({ 
-                action: 'reveal_player', 
+            if (!isMyTurn || acksRequired) return;
+            ws.send(JSON.stringify({
+                action: 'reveal_player',
                 target_player_id: targetId,
                 position: position
             }));

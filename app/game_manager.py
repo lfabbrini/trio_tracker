@@ -832,12 +832,18 @@ class TrioGameManager:
         elif action == "reveal_middle":
             card_id = data.get("card_id")
             if card_id is not None:
+                room = self.get_room(room_id)
+                if room and room.acks_pending:
+                    return  # Ignore reveals while waiting for seen acks
                 await self.reveal_from_middle(room_id, player_id, card_id)
-        
+
         elif action == "reveal_player":
             target_id = data.get("target_player_id")
             position = data.get("position")  # "lowest" or "highest"
             if target_id and position:
+                room = self.get_room(room_id)
+                if room and room.acks_pending:
+                    return  # Ignore reveals while waiting for seen acks
                 await self.reveal_from_player(room_id, player_id, target_id, position)
         
         elif action == "seen_ack":
