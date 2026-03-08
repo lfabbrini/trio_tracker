@@ -8,7 +8,7 @@ import os
 
 from . import database as db
 from .game_manager import game_manager
-from .commentator import comment_on_stats
+from .commentator import comment_on_stats, comment_on_panel
 from .tts_service import async_generate_audio_b64
 
 app = FastAPI(title="Trio Tracker", description="Track your Trio card game wins!")
@@ -184,6 +184,28 @@ async def podium_days_partial(request: Request):
         "request": request,
         "podium_days": db.get_podium_days(),
     })
+
+
+@app.get("/api/comment/{panel}")
+async def api_comment_panel(panel: str):
+    """Generate AI commentary for a specific dashboard panel."""
+    fetchers = {
+        "leaderboard":        lambda: {"leaderboard": db.get_leaderboard()},
+        "win_streaks":        lambda: {"win_streaks": db.get_win_streaks()},
+        "podium_days":        lambda: {"podium_days": db.get_podium_days()},
+        "weekly_leaderboard": lambda: {"weekly_leaderboard": db.get_weekly_leaderboard()},
+        "recent_matches":     lambda: {"recent_matches": db.get_recent_matches(10)},
+        "weekly_history":     lambda: db.get_weekly_history(8),
+    }
+    fetcher = fetchers.get(panel)
+    if not fetcher:
+        raise HTTPException(status_code=404, detail=f"Unknown panel: {panel}")
+    data = fetcher()
+    try:
+        commentary = await asyncio.wait_for(comment_on_panel(panel, data), timeout=8.0)
+    except Exception:
+        commentary = ""
+    return {"commentary": commentary}
 
 
 @app.get("/api/tts/speak")

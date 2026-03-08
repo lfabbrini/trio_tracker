@@ -578,6 +578,24 @@
             }
         }
 
+        async function commentOnPanel(panelName) {
+            const btn = document.getElementById('mic-btn-' + panelName);
+            if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+            try {
+                const res = await fetch('/api/comment/' + panelName);
+                const data = await res.json();
+                const commentary = (data.commentary || '').trim();
+                if (commentary) {
+                    const el = document.getElementById('commentator-text');
+                    if (el) { el.dataset.text = commentary; animateCommentary(); }
+                }
+            } catch (e) {
+                console.warn('Panel commentary error:', e);
+            } finally {
+                if (btn) { btn.textContent = '🎤'; btn.disabled = false; }
+            }
+        }
+
         async function speakCommentary() {
             const el = document.getElementById('commentator-text');
             if (!el) return;

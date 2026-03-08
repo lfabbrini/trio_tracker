@@ -88,6 +88,81 @@ async def _call_ollama(context: str) -> str:
         return ""
 
 
+async def comment_on_panel(panel_name: str, data: dict) -> str:
+    """Generate commentary focused on a specific dashboard panel."""
+    context = _build_panel_context(panel_name, data)
+    return await get_commentary(context) if context else ""
+
+
+def _build_panel_context(panel_name: str, data: dict) -> str:
+    builders = {
+        "leaderboard": _ctx_leaderboard,
+        "win_streaks": _ctx_win_streaks,
+        "podium_days": _ctx_podium_days,
+        "weekly_leaderboard": _ctx_weekly_leaderboard,
+        "recent_matches": _ctx_recent_matches,
+        "weekly_history": _ctx_weekly_history,
+    }
+    builder = builders.get(panel_name)
+    return builder(data) if builder else ""
+
+
+def _ctx_leaderboard(data: dict) -> str:
+    players = data.get("leaderboard", [])
+    if not players:
+        return "Classifica generale: nessun giocatore ancora."
+    lines = [f"#{i+1} {p['name']}: {p['wins']} vittorie, {p['win_rate']}%" for i, p in enumerate(players)]
+    return "Classifica generale:\n" + "\n".join(lines)
+
+
+def _ctx_win_streaks(data: dict) -> str:
+    streaks = data.get("win_streaks", [])
+    active = [s for s in streaks if s.get("streak", 0) >= 2]
+    if not active:
+        return "Serie di vittorie consecutive attive: Nessuna serie attiva."
+    lines = [f"{s['name']}: {s['streak']} vittorie di fila" for s in active]
+    return "Serie di vittorie consecutive attive:\n" + "\n".join(lines)
+
+
+def _ctx_podium_days(data: dict) -> str:
+    players = data.get("podium_days", [])
+    if not players:
+        return "Giorni sul podio per giocatore: nessun dato."
+    lines = [f"{p['name']}: miglior posizione #{p['best_position']}, {p['days']} giorni" for p in players]
+    return "Giorni sul podio per giocatore:\n" + "\n".join(lines)
+
+
+def _ctx_weekly_leaderboard(data: dict) -> str:
+    week_data = data.get("weekly_leaderboard", {})
+    players = week_data.get("players", [])
+    week_start = week_data.get("week_start", "?")
+    week_end = week_data.get("week_end", "?")
+    if not players:
+        return f"Classifica settimana {week_start}-{week_end}: nessuna partita questa settimana."
+    lines = [f"#{i+1} {p['name']}: {p['wins']} vittorie, {p['win_rate']}%" for i, p in enumerate(players)]
+    return f"Classifica settimana {week_start}-{week_end}:\n" + "\n".join(lines)
+
+
+def _ctx_recent_matches(data: dict) -> str:
+    matches = data.get("recent_matches", [])[:5]
+    if not matches:
+        return "Ultime partite: nessuna partita registrata."
+    lines = []
+    for m in matches:
+        opponents = ", ".join(o["name"] for o in m.get("opponents", []))
+        lines.append(f"{m['winner_name']} ha battuto {opponents}" if opponents else f"{m['winner_name']} ha vinto")
+    return "Ultime partite:\n" + "\n".join(lines)
+
+
+def _ctx_weekly_history(data: dict) -> str:
+    datasets = data.get("datasets", [])
+    if not datasets:
+        return "Storico settimanale: nessun dato."
+    totals = {d["player_name"]: sum(d.get("wins", [])) for d in datasets}
+    lines = [f"{name}: {wins} vittorie totali" for name, wins in sorted(totals.items(), key=lambda x: -x[1])]
+    return "Storico settimanale (ultime settimane):\n" + "\n".join(lines)
+
+
 async def comment_on_stats(db_stats: dict) -> str:
     """Generate commentary for the main page based on leaderboard stats."""
     context = _build_stats_context(db_stats)
