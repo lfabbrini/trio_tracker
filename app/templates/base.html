@@ -384,7 +384,7 @@
 
     <!-- AI Commentator Panel -->
     <div id="commentator-panel" class="commentator-panel">
-        <div class="commentator-icon">🎙️</div>
+        <div class="commentator-icon" onclick="speakCommentary()" title="Click to hear" style="cursor:pointer;">🎙️</div>
         <div id="commentator-text" class="commentator-text"
              {% if commentary %}data-text="{{ commentary }}"{% endif %}>
             {% if not commentary %}The commentator is warming up...{% endif %}
@@ -549,6 +549,47 @@
 
         document.addEventListener('DOMContentLoaded', animateCommentary);
         document.addEventListener('htmx:afterSettle', animateCommentary);
+
+        // ── TTS ───────────────────────────────────────────────────────────────
+        let _audioCtx = null;
+
+        function _getAudioCtx() {
+            if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return _audioCtx;
+        }
+
+        document.addEventListener('click', function() { _getAudioCtx().resume(); });
+
+        async function playTTSAudio(base64Audio) {
+            if (!base64Audio) return;
+            try {
+                const ctx = _getAudioCtx();
+                await ctx.resume();
+                const binary = atob(base64Audio);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                const buffer = await ctx.decodeAudioData(bytes.buffer);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
+            } catch (e) {
+                console.warn("TTS error:", e);
+            }
+        }
+
+        async function speakCommentary() {
+            const el = document.getElementById('commentator-text');
+            if (!el) return;
+            const text = (el.dataset.text || el.textContent || '').trim();
+            if (!text) return;
+            const icon = document.querySelector('.commentator-icon');
+            if (icon) icon.style.opacity = '0.5';
+            const res = await fetch('/api/tts/speak?text=' + encodeURIComponent(text));
+            const data = await res.json();
+            if (icon) icon.style.opacity = '1';
+            if (data.audio) playTTSAudio(data.audio);
+        }
     </script>
 </body>
 </html>

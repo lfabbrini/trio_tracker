@@ -314,6 +314,7 @@
         <div id="turn-banner" class="turn-banner other">
             Waiting...
         </div>
+
     </header>
     
     <!-- Main Game Area -->
@@ -408,9 +409,10 @@
 
     <!-- Rules / Commentary Footer -->
     <footer class="max-w-7xl mx-auto p-4 text-center text-xs">
-        <p id="commentator-text" class="text-white/30 transition-all duration-500">
+        <span onclick="speakCommentary()" title="Click to hear" id="commentator-mic"
+              style="cursor:pointer; user-select:none; margin-right:4px;">🎙️</span><span id="commentator-text" class="text-white/30 transition-all duration-500">
             🎯 Find 3 matching numbers | ✅ Match = keep revealing | ❌ Mismatch = turn ends | 🏆 7-trio = instant win!
-        </p>
+        </span>
     </footer>
     
     <script>
@@ -483,6 +485,7 @@
                 case 'player_joined':
                     updateRoom(data.room);
                     addChatMessage('System', `${data.player.name} joined`, 'system');
+                    playTTSAudio(data.tts_audio);
                     break;
                     
                 case 'player_disconnected':
@@ -505,6 +508,7 @@
                     updateModeUI();
                     updateTurnBanner();
                     addChatMessage('System', `🎮 Game started! ${data.current_player} goes first.`, 'system');
+                    playTTSAudio(data.tts_audio);
                     break;
                     
                 case 'your_hand':
@@ -540,6 +544,7 @@
                     } else {
                         addChatMessage('Game', `${data.revealed_by} revealed from Middle`, 'game');
                     }
+                    playTTSAudio(data.tts_audio);
                     break;
                     
                 case 'reveal_match':
@@ -557,6 +562,7 @@
                         renderAckPanel();
                         startAckTimer();
                     }
+                    playTTSAudio(data.tts_audio);
                     break;
                     
                 case 'turn_failed':
@@ -626,6 +632,7 @@
                     document.getElementById('turn-banner').textContent = `🏆 ${data.winner} WINS!`;
                     document.getElementById('turn-banner').className = 'turn-banner';
                     celebrateBig();
+                    playTTSAudio(data.tts_audio);
                     break;
                     
                 case 'chat':
@@ -643,12 +650,14 @@
                         textEl.style.color = 'rgba(255,255,255,0.85)';
                         textEl.style.fontStyle = 'italic';
                         textEl.style.fontSize = '0.9rem';
-                        textEl.textContent = '🎙️ ' + data.text;
+                        textEl.textContent = data.text;
+                        textEl.dataset.commentary = data.text;
                         window._commentaryRestoreTimer = setTimeout(() => {
                             textEl.style.color = '';
                             textEl.style.fontStyle = '';
                             textEl.style.fontSize = '';
                             textEl.textContent = '🎯 Find 3 matching numbers | ✅ Match = keep revealing | ❌ Mismatch = turn ends | 🏆 7-trio = instant win!';
+                            delete textEl.dataset.commentary;
                         }, 10000);
                     }
                     break;
@@ -1150,6 +1159,47 @@
             }
         }
         
+        // ── TTS ───────────────────────────────────────────────────────────────
+        let _audioCtx = null;
+
+        function _getAudioCtx() {
+            if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            return _audioCtx;
+        }
+
+        document.addEventListener('click', function() { _getAudioCtx().resume(); });
+
+        async function playTTSAudio(base64Audio) {
+            if (!base64Audio) return;
+            try {
+                const ctx = _getAudioCtx();
+                await ctx.resume();
+                const binary = atob(base64Audio);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                const buffer = await ctx.decodeAudioData(bytes.buffer);
+                const source = ctx.createBufferSource();
+                source.buffer = buffer;
+                source.connect(ctx.destination);
+                source.start(0);
+            } catch (e) {
+                console.warn("TTS error:", e);
+            }
+        }
+
+        async function speakCommentary() {
+            const el = document.getElementById('commentator-text');
+            if (!el) return;
+            const text = (el.dataset.commentary || '').trim();
+            if (!text) return;
+            const mic = document.getElementById('commentator-mic');
+            if (mic) mic.style.opacity = '0.5';
+            const res = await fetch('/api/tts/speak?text=' + encodeURIComponent(text));
+            const data = await res.json();
+            if (mic) mic.style.opacity = '1';
+            if (data.audio) playTTSAudio(data.audio);
+        }
+
         // Start
         connect();
     </script>

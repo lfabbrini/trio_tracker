@@ -5,7 +5,8 @@
       "Bash(gh issue view:*)",
       "Bash(python:*)",
       "Bash(where:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(py:*)"
     ]
   }
 }

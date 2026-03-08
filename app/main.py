@@ -9,6 +9,7 @@ import os
 from . import database as db
 from .game_manager import game_manager
 from .commentator import comment_on_stats
+from .tts_service import async_generate_audio_b64
 
 app = FastAPI(title="Trio Tracker", description="Track your Trio card game wins!")
 
@@ -183,6 +184,15 @@ async def podium_days_partial(request: Request):
         "request": request,
         "podium_days": db.get_podium_days(),
     })
+
+
+@app.get("/api/tts/speak")
+async def api_tts_speak(text: str = ""):
+    """Generate TTS audio for the given text."""
+    if not text:
+        return {"audio": None}
+    audio = await async_generate_audio_b64(text)
+    return {"audio": audio}
 
 
 @app.get("/api/weekly-history")

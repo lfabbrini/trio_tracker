@@ -262,7 +262,7 @@ class TrioGameManager:
         await self.broadcast(room_id, {
             "type": "player_joined",
             "player": player.to_public_dict(),
-            "room": room.to_dict()
+            "room": room.to_dict(),
         })
         
         # Send welcome message to new player
@@ -398,7 +398,7 @@ class TrioGameManager:
             "current_player": room.current_player.name,
             "current_player_id": room.current_player_id,
             "middle_card_count": len(room.middle_cards),
-            "room": room.to_dict()
+            "room": room.to_dict(),
         })
         
         # Send each player their private hand
@@ -526,7 +526,7 @@ class TrioGameManager:
             "source": "Middle",
             "position": None,
             "revealed_by": room.current_player.name,
-            "show_to_all": True  # Middle cards are visible to all
+            "show_to_all": True,
         })
         
         # Check turn result
@@ -588,7 +588,7 @@ class TrioGameManager:
             "source_id": target_player_id,
             "position": position,
             "revealed_by": room.current_player.name,
-            "show_to_all": True  # All revealed cards are visible to everyone
+            "show_to_all": True,
         })
         
         # Update target player's hand view

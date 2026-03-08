@@ -24,7 +24,8 @@
 
 {% if commentary %}
 <div id="commentator-panel" hx-swap-oob="true" class="commentator-panel">
-    <div class="commentator-icon">🎙️</div>
+    <div class="commentator-icon" onclick="speakCommentary()" title="Click to hear" style="cursor:pointer;">🎙️</div>
     <div id="commentator-text" class="commentator-text" data-text="{{ commentary }}"></div>
 </div>
 {% endif %}
+
