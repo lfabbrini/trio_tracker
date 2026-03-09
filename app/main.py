@@ -8,7 +8,7 @@ import os
 
 from . import database as db
 from .game_manager import game_manager
-from .commentator import comment_on_stats, comment_on_panel
+from .commentator import comment_on_stats, comment_on_panel, comment_on_match
 from .tts_service import async_generate_audio_b64
 
 app = FastAPI(title="Trio Tracker", description="Track your Trio card game wins!")
@@ -259,15 +259,24 @@ async def record_match(
     win_streaks = db.get_win_streaks()
 
     # Generate commentary for the match event
-    winner = next((p for p in leaderboard if p["id"] == winner_id), None)
-    stats_for_commentary = {
-        "players": [
-            {**p, "streak": next((s["streak"] for s in win_streaks if s["name"] == p["name"]), 0)}
-            for p in leaderboard
-        ]
-    }
+    players_with_streaks = [
+        {**p, "streak": next((s["streak"] for s in win_streaks if s["name"] == p["name"]), 0)}
+        for p in leaderboard
+    ]
+    winner = next((p for p in players_with_streaks if p["id"] == winner_id), None)
+    opponent_ids = [pid for pid in participants if pid != winner_id]
+    all_players = db.get_all_players()
+    opponent_names = [p["name"] for p in all_players if p["id"] in opponent_ids]
+    stats_for_commentary = {"players": players_with_streaks}
     try:
-        commentary = await asyncio.wait_for(comment_on_stats(stats_for_commentary), timeout=8.0)
+        if winner:
+            commentary = await asyncio.wait_for(
+                comment_on_match(winner, opponent_names, stats_for_commentary), timeout=8.0
+            )
+        else:
+            commentary = await asyncio.wait_for(
+                comment_on_stats(stats_for_commentary), timeout=8.0
+            )
     except Exception:
         commentary = ""
 

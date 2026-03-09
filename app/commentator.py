@@ -169,6 +169,36 @@ async def comment_on_stats(db_stats: dict) -> str:
     return await get_commentary(context)
 
 
+async def comment_on_match(winner: dict, opponents: list, stats: dict) -> str:
+    """Generate commentary focused on the match winner."""
+    context = _build_match_context(winner, opponents, stats)
+    return await get_commentary(context)
+
+
+def _build_match_context(winner: dict, opponents: list, stats: dict) -> str:
+    """Build a context string centered on the match winner."""
+    name = winner["name"]
+    wins = winner["wins"]
+    win_rate = winner["win_rate"]
+    streak = winner.get("streak", 0)
+
+    opponents_str = ", ".join(opponents) if opponents else "gli avversari"
+
+    lines = [
+        f"Partita appena conclusa: {name} ha battuto {opponents_str}!",
+        f"Statistiche di {name}: {wins} vittorie totali, {win_rate}% di vittorie.",
+    ]
+    if streak >= 2:
+        lines.append(f"{name} è in una serie di {streak} vittorie consecutive!")
+
+    players = stats.get("players", [])
+    if players:
+        ranking = [f"#{i+1} {p['name']} ({p['wins']} vinte)" for i, p in enumerate(players[:3])]
+        lines.append("Top 3: " + ", ".join(ranking))
+
+    return "\n".join(lines)
+
+
 async def comment_on_game_event(event_type: str, details: dict) -> str:
     """Generate commentary for a live game event."""
     context = _build_game_context(event_type, details)
