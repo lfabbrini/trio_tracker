@@ -161,15 +161,15 @@ def get_leaderboard():
 
 
 def get_weekly_leaderboard():
-    """Get leaderboard stats filtered to the current Mon-Fri work week."""
+    """Get leaderboard stats filtered to the current Mon-Sun week."""
     from datetime import timedelta
 
     today = datetime.now().date()
     # Monday = 0, Sunday = 6
     monday = today - timedelta(days=today.weekday())
-    friday = monday + timedelta(days=4)
-    week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).isoformat()
-    week_end = datetime(friday.year, friday.month, friday.day, 23, 59, 59).isoformat()
+    sunday = monday + timedelta(days=6)
+    week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).strftime("%Y-%m-%d %H:%M:%S")
+    week_end = datetime(sunday.year, sunday.month, sunday.day, 23, 59, 59).strftime("%Y-%m-%d %H:%M:%S")
 
     with get_connection() as conn:
         cursor = conn.cursor()
@@ -199,7 +199,7 @@ def get_weekly_leaderboard():
     return {
         "players": players,
         "week_start": monday.strftime("%d/%m"),
-        "week_end": friday.strftime("%d/%m"),
+        "week_end": sunday.strftime("%d/%m"),
     }
 
 
@@ -298,8 +298,8 @@ def get_weekly_history(weeks: int = 8):
     week_boundaries = []
     for i in range(weeks - 1, -1, -1):
         monday = current_monday - timedelta(weeks=i)
-        friday = monday + timedelta(days=4)
-        week_boundaries.append((monday, friday))
+        sunday = monday + timedelta(days=6)
+        week_boundaries.append((monday, sunday))
 
     labels = [f"{m.strftime('%d/%m')}" for m, f in week_boundaries]
 
@@ -309,9 +309,9 @@ def get_weekly_history(weeks: int = 8):
         # Collect wins per player per week
         player_wins = {}  # player_name -> [wins_per_week]
 
-        for week_idx, (monday, friday) in enumerate(week_boundaries):
-            week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).isoformat()
-            week_end = datetime(friday.year, friday.month, friday.day, 23, 59, 59).isoformat()
+        for week_idx, (monday, sunday) in enumerate(week_boundaries):
+            week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).strftime("%Y-%m-%d %H:%M:%S")
+            week_end = datetime(sunday.year, sunday.month, sunday.day, 23, 59, 59).strftime("%Y-%m-%d %H:%M:%S")
 
             cursor.execute("""
                 SELECT p.name, COUNT(m.id) as wins
