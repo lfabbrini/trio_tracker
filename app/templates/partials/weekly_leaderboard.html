@@ -1,4 +1,5 @@
 {% if weekly_leaderboard.players %}
+{% set max_wins = (weekly_leaderboard.players | map(attribute='wins') | list | max) if weekly_leaderboard.players else 1 %}
 <p class="text-slate-400 text-xs mb-3">{{ weekly_leaderboard.week_start }} - {{ weekly_leaderboard.week_end }}</p>
 <div class="space-y-3">
     {% for player in weekly_leaderboard.players[:5] %}
@@ -20,10 +21,10 @@
             </div>
 
             <!-- Win bar visualization -->
-            {% if weekly_leaderboard.players[0].wins > 0 %}
+            {% if max_wins > 0 %}
             <div class="mt-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                 <div class="weekly-bar h-full rounded-full transition-all duration-500"
-                     style="width: {{ (player.wins / weekly_leaderboard.players[0].wins * 100) | round }}%"></div>
+                     style="width: {{ (player.wins / max_wins * 100) | round }}%"></div>
             </div>
             {% endif %}
         </div>

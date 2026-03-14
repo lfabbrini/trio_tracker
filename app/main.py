@@ -86,26 +86,31 @@ async def index(request: Request):
         "recent_matches": db.get_recent_matches(),
         "podium_days": db.get_podium_days(),
         "commentary": commentary,
+        "sort": "wins",
     })
 
 
 # === HTMX Partials ===
 
 @app.get("/partials/leaderboard", response_class=HTMLResponse)
-async def leaderboard_partial(request: Request):
+async def leaderboard_partial(request: Request, sort: str = "wins"):
     """Leaderboard fragment for HTMX."""
+    sort = sort if sort in ("wins", "win_rate") else "wins"
     return templates.TemplateResponse("partials/leaderboard.html", {
         "request": request,
-        "leaderboard": db.get_leaderboard(),
+        "leaderboard": db.get_leaderboard(sort=sort),
+        "sort": sort,
     })
 
 
 @app.get("/partials/most-active", response_class=HTMLResponse)
-async def weekly_leaderboard_partial(request: Request):
+async def weekly_leaderboard_partial(request: Request, sort: str = "wins"):
     """Weekly leaderboard fragment for HTMX."""
+    sort = sort if sort in ("wins", "win_rate") else "wins"
     return templates.TemplateResponse("partials/weekly_leaderboard.html", {
         "request": request,
-        "weekly_leaderboard": db.get_weekly_leaderboard(),
+        "weekly_leaderboard": db.get_weekly_leaderboard(sort=sort),
+        "sort": sort,
     })
 
 
@@ -218,9 +223,10 @@ async def api_tts_speak(text: str = ""):
 
 
 @app.get("/api/weekly-history")
-async def weekly_history_api(weeks: int = 8):
+async def weekly_history_api(weeks: int = 8, metric: str = "wins"):
     """Return weekly win history as JSON for Chart.js."""
-    data = db.get_weekly_history(weeks=weeks)
+    metric = metric if metric in ("wins", "win_rate") else "wins"
+    data = db.get_weekly_history(weeks=weeks, metric=metric)
     return JSONResponse(content=data)
 
 
@@ -237,6 +243,7 @@ async def delete_last_match(request: Request):
         "recent_matches": db.get_recent_matches(),
         "win_streaks": db.get_win_streaks(),
         "podium_days": db.get_podium_days(),
+        "sort": "wins",
     })
 
 
@@ -290,6 +297,7 @@ async def record_match(
         "win_streaks": win_streaks,
         "podium_days": db.get_podium_days(),
         "commentary": commentary,
+        "sort": "wins",
     })
 
 

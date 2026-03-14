@@ -21,9 +21,10 @@
     ];
 
     let chartInstance = null;
+    let currentMetric = 'wins';
 
     function loadChart() {
-        fetch('/api/weekly-history')
+        fetch('/api/weekly-history?metric=' + currentMetric)
             .then(r => r.json())
             .then(data => {
                 const canvas = document.getElementById('weekly-history-canvas');
@@ -40,9 +41,11 @@
                 canvas.style.display = '';
                 emptyMsg.classList.add('hidden');
 
+                const isWinRate = currentMetric === 'win_rate';
+
                 const datasets = data.datasets.map((ds, i) => ({
                     label: ds.player_name,
-                    data: ds.wins,
+                    data: ds.values,
                     borderColor: COLORS[i % COLORS.length],
                     backgroundColor: COLORS[i % COLORS.length],
                     tension: 0.3,
@@ -67,12 +70,15 @@
                             },
                             y: {
                                 beginAtZero: true,
+                                max: isWinRate ? 100 : undefined,
                                 grid: { color: 'rgba(148, 163, 184, 0.1)' },
                                 ticks: {
                                     color: '#94a3b8',
                                     font: { family: 'Outfit' },
-                                    stepSize: 1,
-                                    precision: 0,
+                                    ...(isWinRate
+                                        ? { callback: v => v + '%' }
+                                        : { stepSize: 1, precision: 0 }
+                                    ),
                                 },
                             },
                         },
@@ -94,12 +100,21 @@
                                 bodyFont: { family: 'Outfit' },
                                 cornerRadius: 8,
                                 padding: 12,
+                                callbacks: isWinRate ? {
+                                    label: ctx => ctx.dataset.label + ': ' + ctx.parsed.y + '%'
+                                } : {},
                             },
                         },
                     },
                 });
             });
     }
+
+    // Expose to global scope so the header toggle button can call it
+    window.setChartMetric = function(metric) {
+        currentMetric = metric;
+        loadChart();
+    };
 
     // Initial load
     loadChart();

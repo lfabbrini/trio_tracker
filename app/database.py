@@ -136,34 +136,36 @@ def delete_last_match() -> dict | None:
         return {"id": match["id"], "winner_id": match["winner_id"]}
 
 
-def get_leaderboard():
+def get_leaderboard(sort: str = "wins"):
     """Get player stats for leaderboard."""
+    order = "win_rate DESC, wins DESC, p.name" if sort == "win_rate" else "wins DESC, win_rate DESC, p.name"
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
-            SELECT 
+        cursor.execute(f"""
+            SELECT
                 p.id,
                 p.name,
                 COUNT(DISTINCT m.id) as wins,
                 COUNT(DISTINCT mp.match_id) as matches_played,
-                CASE 
-                    WHEN COUNT(DISTINCT mp.match_id) > 0 
+                CASE
+                    WHEN COUNT(DISTINCT mp.match_id) > 0
                     THEN ROUND(COUNT(DISTINCT m.id) * 100.0 / COUNT(DISTINCT mp.match_id), 1)
-                    ELSE 0 
+                    ELSE 0
                 END as win_rate
             FROM players p
             LEFT JOIN matches m ON p.id = m.winner_id
             LEFT JOIN match_players mp ON p.id = mp.player_id
             GROUP BY p.id
-            ORDER BY wins DESC, win_rate DESC, p.name
+            ORDER BY {order}
         """)
         return [dict(row) for row in cursor.fetchall()]
 
 
-def get_weekly_leaderboard():
+def get_weekly_leaderboard(sort: str = "wins"):
     """Get leaderboard stats filtered to the current Mon-Sun week."""
     from datetime import timedelta
 
+    order = "win_rate DESC, wins DESC, p.name" if sort == "win_rate" else "wins DESC, win_rate DESC, p.name"
     today = datetime.now().date()
     # Monday = 0, Sunday = 6
     monday = today - timedelta(days=today.weekday())
@@ -173,7 +175,7 @@ def get_weekly_leaderboard():
 
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT
                 p.id,
                 p.name,
@@ -191,7 +193,7 @@ def get_weekly_leaderboard():
                 AND mp.match_id IN (SELECT id FROM matches WHERE played_at BETWEEN ? AND ?)
             GROUP BY p.id
             HAVING matches_played > 0
-            ORDER BY wins DESC, win_rate DESC, p.name
+            ORDER BY {order}
         """, (week_start, week_end, week_start, week_end))
 
         players = [dict(row) for row in cursor.fetchall()]
@@ -282,16 +284,15 @@ def get_win_streaks():
         return result
 
 
-def get_weekly_history(weeks: int = 8):
-    """Get wins per player per week for the last N weeks.
+def get_weekly_history(weeks: int = 8, metric: str = "wins"):
+    """Get wins (or win rate) per player per week for the last N weeks.
 
-    Returns a dict with 'labels' (week date strings) and 'datasets'
-    (one entry per player with their weekly win counts).
+    Returns a dict with 'labels', 'metric', and 'datasets'
+    (one entry per player with their weekly values under key 'values').
     """
     from datetime import timedelta
 
     today = datetime.now().date()
-    # Current week's Monday
     current_monday = today - timedelta(days=today.weekday())
 
     # Build week boundaries (oldest first)
@@ -301,40 +302,58 @@ def get_weekly_history(weeks: int = 8):
         sunday = monday + timedelta(days=6)
         week_boundaries.append((monday, sunday))
 
-    labels = [f"{m.strftime('%d/%m')}" for m, f in week_boundaries]
+    labels = [f"{m.strftime('%d/%m')}" for m, _ in week_boundaries]
 
     with get_connection() as conn:
         cursor = conn.cursor()
 
-        # Collect wins per player per week
-        player_wins = {}  # player_name -> [wins_per_week]
+        # player_name -> [value_per_week]
+        player_values = {}
 
         for week_idx, (monday, sunday) in enumerate(week_boundaries):
             week_start = datetime(monday.year, monday.month, monday.day, 0, 0, 0).strftime("%Y-%m-%d %H:%M:%S")
             week_end = datetime(sunday.year, sunday.month, sunday.day, 23, 59, 59).strftime("%Y-%m-%d %H:%M:%S")
 
-            cursor.execute("""
-                SELECT p.name, COUNT(m.id) as wins
-                FROM matches m
-                JOIN players p ON m.winner_id = p.id
-                WHERE m.played_at BETWEEN ? AND ?
-                GROUP BY p.id
-            """, (week_start, week_end))
+            if metric == "win_rate":
+                cursor.execute("""
+                    SELECT p.name,
+                           COUNT(DISTINCT m.id) as wins,
+                           COUNT(DISTINCT mp.match_id) as matches_played
+                    FROM players p
+                    LEFT JOIN matches m ON p.id = m.winner_id
+                        AND m.played_at BETWEEN ? AND ?
+                    LEFT JOIN match_players mp ON p.id = mp.player_id
+                        AND mp.match_id IN (SELECT id FROM matches WHERE played_at BETWEEN ? AND ?)
+                    GROUP BY p.id
+                    HAVING matches_played > 0
+                """, (week_start, week_end, week_start, week_end))
 
-            week_results = {row['name']: row['wins'] for row in cursor.fetchall()}
+                for row in cursor.fetchall():
+                    name = row['name']
+                    value = round(row['wins'] / row['matches_played'] * 100, 1) if row['matches_played'] > 0 else 0.0
+                    if name not in player_values:
+                        player_values[name] = [0.0] * weeks
+                    player_values[name][week_idx] = value
+            else:
+                cursor.execute("""
+                    SELECT p.name, COUNT(m.id) as wins
+                    FROM matches m
+                    JOIN players p ON m.winner_id = p.id
+                    WHERE m.played_at BETWEEN ? AND ?
+                    GROUP BY p.id
+                """, (week_start, week_end))
 
-            for name, wins in week_results.items():
-                if name not in player_wins:
-                    player_wins[name] = [0] * weeks
-                player_wins[name][week_idx] = wins
+                for row in cursor.fetchall():
+                    name = row['name']
+                    if name not in player_values:
+                        player_values[name] = [0] * weeks
+                    player_values[name][week_idx] = row['wins']
 
-    # Build datasets, sorted by total wins descending
-    datasets = []
-    for name, wins in player_wins.items():
-        datasets.append({"player_name": name, "wins": wins})
-    datasets.sort(key=lambda d: sum(d["wins"]), reverse=True)
+    # Build datasets, sorted by total descending
+    datasets = [{"player_name": name, "values": vals} for name, vals in player_values.items()]
+    datasets.sort(key=lambda d: sum(d["values"]), reverse=True)
 
-    return {"labels": labels, "datasets": datasets}
+    return {"labels": labels, "metric": metric, "datasets": datasets}
 
 
 def get_podium_days():

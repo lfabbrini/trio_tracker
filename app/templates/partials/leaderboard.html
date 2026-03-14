@@ -1,8 +1,9 @@
 {% if leaderboard %}
+{% set max_wins = (leaderboard | map(attribute='wins') | list | max) if leaderboard else 1 %}
 <div class="space-y-3">
     {% for player in leaderboard %}
     <div class="flex items-center gap-4 p-3 rounded-xl transition-all duration-200 hover:bg-white/5 {% if loop.index <= 3 and player.wins > 0 %}bg-gradient-to-r from-yellow-400/5 to-transparent{% endif %}">
-        
+
         <!-- Rank Badge -->
         <div class="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg
             {% if loop.index == 1 and player.wins > 0 %}rank-1 shadow-lg shadow-yellow-500/30
@@ -19,7 +20,7 @@
                 {{ loop.index }}
             {% endif %}
         </div>
-        
+
         <!-- Player Info -->
         <div class="flex-grow min-w-0">
             <div class="flex items-center gap-2">
@@ -28,16 +29,16 @@
                 <span class="text-yellow-400 text-sm animate-pulse">★</span>
                 {% endif %}
             </div>
-            
+
             <!-- Win bar visualization -->
-            {% if leaderboard[0].wins > 0 %}
+            {% if max_wins > 0 %}
             <div class="mt-1 h-1.5 bg-slate-700 rounded-full overflow-hidden">
                 <div class="win-bar h-full rounded-full transition-all duration-500"
-                     style="width: {{ (player.wins / leaderboard[0].wins * 100) | round }}%"></div>
+                     style="width: {{ (player.wins / max_wins * 100) | round }}%"></div>
             </div>
             {% endif %}
         </div>
-        
+
         <!-- Stats -->
         <div class="flex-shrink-0 text-right">
             <div class="text-xl font-bold text-white">{{ player.wins }}</div>

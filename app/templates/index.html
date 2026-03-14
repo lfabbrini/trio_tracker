@@ -15,8 +15,14 @@
                         LEADERBOARD
                     </h2>
                 </div>
-                <button id="mic-btn-leaderboard" onclick="commentOnPanel('leaderboard')" title="Commento AI su questo pannello"
-                        class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">🤌</button>
+                <div class="flex items-center gap-1">
+                    <button id="sort-btn-leaderboard" data-sort="wins"
+                            onclick="toggleSort('/partials/leaderboard', '#leaderboard', this)"
+                            title="Ordina per tasso di vittoria / vittorie"
+                            class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">⇅</button>
+                    <button id="mic-btn-leaderboard" onclick="commentOnPanel('leaderboard')" title="Commento AI su questo pannello"
+                            class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">🤌</button>
+                </div>
             </div>
             
             <div id="leaderboard" hx-get="/partials/leaderboard" hx-trigger="every 30s">
@@ -69,8 +75,14 @@
                         WEEKLY LEADERBOARD
                     </h2>
                 </div>
-                <button id="mic-btn-weekly_leaderboard" onclick="commentOnPanel('weekly_leaderboard')" title="Commento AI su questo pannello"
-                        class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">🤌</button>
+                <div class="flex items-center gap-1">
+                    <button id="sort-btn-weekly_leaderboard" data-sort="wins"
+                            onclick="toggleSort('/partials/most-active', '#weekly-leaderboard', this)"
+                            title="Ordina per tasso di vittoria / vittorie"
+                            class="btn btn-xs btn-ghost text-slate-400 hover:text-cyan-400 transition-colors duration-200 text-sm px-2">⇅</button>
+                    <button id="mic-btn-weekly_leaderboard" onclick="commentOnPanel('weekly_leaderboard')" title="Commento AI su questo pannello"
+                            class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">🤌</button>
+                </div>
             </div>
 
             <div id="weekly-leaderboard" hx-get="/partials/most-active" hx-trigger="every 30s">
@@ -136,8 +148,14 @@
                         WEEKLY HISTORY
                     </h2>
                 </div>
-                <button id="mic-btn-weekly_history" onclick="commentOnPanel('weekly_history')" title="Commento AI su questo pannello"
-                        class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">🤌</button>
+                <div class="flex items-center gap-1">
+                    <button id="metric-btn-weekly_history" data-metric="wins"
+                            onclick="toggleChartMetric(this)"
+                            title="Mostra vittorie / tasso di vittoria"
+                            class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">⇅</button>
+                    <button id="mic-btn-weekly_history" onclick="commentOnPanel('weekly_history')" title="Commento AI su questo pannello"
+                            class="btn btn-xs btn-ghost text-slate-400 hover:text-yellow-400 transition-colors duration-200 text-sm px-2">🤌</button>
+                </div>
             </div>
             <div id="weekly-history" style="height: 350px;">
                 {% include "partials/weekly_history_chart.html" %}
@@ -145,4 +163,34 @@
         </div>
     </div>
 </div>
+<script>
+function toggleSort(url, target, btn) {
+    const newSort = btn.dataset.sort === 'wins' ? 'win_rate' : 'wins';
+    btn.dataset.sort = newSort;
+    btn.classList.toggle('text-yellow-400', newSort === 'win_rate');
+    btn.classList.toggle('text-slate-400', newSort === 'wins');
+    htmx.ajax('GET', url + '?sort=' + newSort, {target: target, swap: 'innerHTML'});
+}
+
+function toggleChartMetric(btn) {
+    const newMetric = btn.dataset.metric === 'wins' ? 'win_rate' : 'wins';
+    btn.dataset.metric = newMetric;
+    btn.classList.toggle('text-yellow-400', newMetric === 'win_rate');
+    btn.classList.toggle('text-slate-400', newMetric === 'wins');
+    if (window.setChartMetric) window.setChartMetric(newMetric);
+}
+
+// Reset sort button highlights when OOB swaps reload leaderboards with default "wins" sort
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    const targetId = evt.detail.target && evt.detail.target.id;
+    if (targetId === 'leaderboard') {
+        const btn = document.getElementById('sort-btn-leaderboard');
+        if (btn) { btn.dataset.sort = 'wins'; btn.classList.remove('text-yellow-400'); btn.classList.add('text-slate-400'); }
+    }
+    if (targetId === 'weekly-leaderboard') {
+        const btn = document.getElementById('sort-btn-weekly_leaderboard');
+        if (btn) { btn.dataset.sort = 'wins'; btn.classList.remove('text-yellow-400'); btn.classList.add('text-slate-400'); }
+    }
+});
+</script>
 {% endblock %}
