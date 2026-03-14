@@ -180,16 +180,13 @@ function toggleChartMetric(btn) {
     if (window.setChartMetric) window.setChartMetric(newMetric);
 }
 
-// Reset sort button highlights when OOB swaps reload leaderboards with default "wins" sort
+// Reset sort buttons only when a match is recorded (OOB reloads leaderboards with default "wins")
 document.body.addEventListener('htmx:afterSwap', function(evt) {
-    const targetId = evt.detail.target && evt.detail.target.id;
-    if (targetId === 'leaderboard') {
-        const btn = document.getElementById('sort-btn-leaderboard');
-        if (btn) { btn.dataset.sort = 'wins'; btn.classList.remove('text-yellow-400'); btn.classList.add('text-slate-400'); }
-    }
-    if (targetId === 'weekly-leaderboard') {
-        const btn = document.getElementById('sort-btn-weekly_leaderboard');
-        if (btn) { btn.dataset.sort = 'wins'; btn.classList.remove('text-yellow-400'); btn.classList.add('text-slate-400'); }
+    if (evt.detail.target && evt.detail.target.id === 'match-form') {
+        const btn1 = document.getElementById('sort-btn-leaderboard');
+        if (btn1) { btn1.dataset.sort = 'wins'; btn1.classList.remove('text-yellow-400'); btn1.classList.add('text-slate-400'); }
+        const btn2 = document.getElementById('sort-btn-weekly_leaderboard');
+        if (btn2) { btn2.dataset.sort = 'wins'; btn2.classList.remove('text-yellow-400'); btn2.classList.add('text-slate-400'); }
     }
 });
 </script>
