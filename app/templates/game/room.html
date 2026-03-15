@@ -440,6 +440,12 @@
         function getCardColor(cardId) {
             return SUIT_COLORS[getCardSuit(cardId)];
         }
+
+        function cardLabel(n) {
+            if (n === 11) return 'J';
+            if (n === 12) return 'Q';
+            return n;
+        }
         
         // Game state
         const roomId = "{{ room_id }}";
@@ -710,7 +716,7 @@
                         <div class="flex gap-1 mt-1 flex-wrap">
                             ${p.trios.map(trio => `
                                 <span class="text-xs px-1.5 py-0.5 rounded bg-emerald-500/30 text-emerald-300 font-bold">
-                                    ${trio[0]}×3
+                                    ${cardLabel(trio[0])}${cardLabel(trio[0])}${cardLabel(trio[0])}
                                 </span>
                             `).join('')}
                         </div>
@@ -798,7 +804,7 @@
                     const isNew = isRevealed && !previousRevealedIds.has(card.id);
                     return `<div class="playing-card small ${getCardColor(card.id)} revealed disabled ${isNew ? 'card-reveal-anim' : ''}"
                                  ${isRevealed ? 'data-revealed-card="true"' : ''}>
-                                <span class="number">${card.number}</span>
+                                <span class="number">${cardLabel(card.number)}</span>
                                 <span class="suit">${getCardSuit(card.id)}</span>
                             </div>`;
                 } else {
@@ -893,7 +899,7 @@
                                     <div class="text-center">
                                         <div class="playing-card small ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
                                              data-revealed-card="true" style="cursor: default;">
-                                            <span class="number">${r.card.number}</span>
+                                            <span class="number">${cardLabel(r.card.number)}</span>
                                             <span class="suit">${getCardSuit(r.card.id)}</span>
                                         </div>
                                         <p class="text-white/40 text-[0.6rem] mt-0.5">${r.position || ''}</p>
@@ -951,7 +957,7 @@
                     <div class="text-center">
                         <div class="playing-card ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
                              data-revealed-card="true" style="cursor: default;">
-                            <span class="number">${r.card.number}</span>
+                            <span class="number">${cardLabel(r.card.number)}</span>
                             <span class="suit">${getCardSuit(r.card.id)}</span>
                         </div>
                         <p class="text-yellow-400/70 text-[0.6rem] font-bold mt-0.5">REVEALED</p>
@@ -986,7 +992,7 @@
                     <div class="playing-card ${getCardColor(card.id)} ${isClickable ? 'clickable-card' : ''}"
                          style="cursor: ${isClickable ? 'pointer' : 'default'};"
                          ${clickHandler}>
-                        <span class="number">${card.number}</span>
+                        <span class="number">${cardLabel(card.number)}</span>
                         <span class="suit">${getCardSuit(card.id)}</span>
                         ${isLow ? '<span class="card-label low">LOW</span>' : ''}
                         ${isHigh && !isOnlyCard ? '<span class="card-label high">HIGH</span>' : ''}
