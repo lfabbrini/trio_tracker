@@ -44,10 +44,12 @@ class Player:
     """A player in the game."""
     id: str
     name: str
-    websocket: WebSocket
     hand: List[Card] = field(default_factory=list)  # Sorted by number
     trios: List[List[Card]] = field(default_factory=list)  # Collected trios
     connected: bool = True
+    websocket: Optional[WebSocket] = None
+    is_cpu: bool = False
+    cpu_difficulty: str = "medium"  # "easy", "medium", "hard"
     
     def sort_hand(self):
         """Sort hand by card number."""
@@ -76,7 +78,8 @@ class Player:
             "card_count": len(self.hand),
             "trio_count": len(self.trios),
             "trios": [[c.number for c in trio] for trio in self.trios],
-            "connected": self.connected
+            "connected": self.connected,
+            "is_cpu": self.is_cpu,
         }
     
     def to_private_dict(self):
@@ -129,6 +132,8 @@ class GameRoom:
     max_players: int = 6
     min_players: int = 3
     
+    cpu_memory: Dict[int, int] = field(default_factory=dict)  # card_id -> number
+
     # Connected numbers for SPICY mode (which numbers connect to which)
     # In Trio, connected numbers are shown in card corners
     CONNECTIONS = {
@@ -324,7 +329,7 @@ class TrioGameManager:
             return
         
         for player_id, player in room.players.items():
-            if player_id not in exclude and player.connected:
+            if player_id not in exclude and player.connected and not player.is_cpu:
                 try:
                     await player.websocket.send_json(message)
                 except:
@@ -335,6 +340,8 @@ class TrioGameManager:
         room = self.get_room(room_id)
         if room and player_id in room.players:
             player = room.players[player_id]
+            if player.is_cpu:
+                return
             if player.connected:
                 try:
                     await player.websocket.send_json(message)
@@ -416,6 +423,10 @@ class TrioGameManager:
 
         # THEN send initial game state (buttons will now be enabled for first player)
         await self.send_game_state(room_id)
+
+        # Schedule CPU turn if first player is CPU
+        if room.current_player and room.current_player.is_cpu:
+            asyncio.create_task(self.cpu_take_turn(room_id, room.current_player_id))
 
         # Fire-and-forget commentary
         player_names = ", ".join(room.players[pid].name for pid in room.player_order)
@@ -512,7 +523,8 @@ class TrioGameManager:
         
         # Reveal the card
         room.middle_face_up[card_id] = True
-        
+        room.cpu_memory[card_id] = card.number
+
         # Add to revealed this turn
         room.revealed_this_turn.append(RevealedCard(
             card=card,
@@ -569,10 +581,11 @@ class TrioGameManager:
         
         # Get the card
         card = target_player.get_lowest() if position == "lowest" else target_player.get_highest()
-        
+
         # Remove from hand
         target_player.remove_card(card.id)
-        
+        room.cpu_memory[card.id] = card.number
+
         # Add to revealed this turn
         room.revealed_this_turn.append(RevealedCard(
             card=card,
@@ -621,7 +634,8 @@ class TrioGameManager:
         # Check for trio (3 identical)
         if len(revealed) >= 3:
             if numbers[-1] == numbers[-2] == numbers[-3]:
-                # TRIO FOUND!
+                # TRIO FOUND! Send game state first so everyone sees all 3 revealed cards
+                await self.send_game_state(room_id)
                 await self.complete_trio(room_id)
                 return
         
@@ -663,6 +677,11 @@ class TrioGameManager:
         # Set acks (same as fail_turn)
         room.acks_pending = {pid for pid, p in room.players.items() if p.connected}
 
+        # CPU players auto-ACK immediately
+        for pid in list(room.acks_pending):
+            if room.players[pid].is_cpu:
+                room.acks_pending.discard(pid)
+
         await self.broadcast(room_id, {
             "type": "trio_complete",
             "player": player.name,
@@ -678,6 +697,10 @@ class TrioGameManager:
             "player": player.name,
             "cards": f"{trio_number}, {trio_number}, {trio_number}",
         }))
+
+        # If all acks handled (only CPU players), proceed immediately
+        if not room.acks_pending:
+            await self.finalize_trio(room_id)
 
     async def finalize_trio(self, room_id: str):
         """Finalize trio collection after all acks received."""
@@ -720,6 +743,12 @@ class TrioGameManager:
 
         player = room.current_player
         room.acks_pending = {pid for pid, p in room.players.items() if p.connected}
+
+        # CPU players auto-ACK immediately
+        for pid in list(room.acks_pending):
+            if room.players[pid].is_cpu:
+                room.acks_pending.discard(pid)
+
         revealed_numbers = [str(r.card.number) for r in room.revealed_this_turn]
         await self.broadcast(room_id, {
             "type": "turn_failed",
@@ -734,6 +763,11 @@ class TrioGameManager:
             "player": player.name,
             "cards": ", ".join(revealed_numbers),
         }))
+
+        # If all acks handled (only CPU players), proceed immediately
+        if not room.acks_pending:
+            await self.return_revealed_cards(room_id)
+            await self.next_turn(room_id)
     
     async def return_revealed_cards(self, room_id: str):
         """Return all revealed cards to their sources."""
@@ -849,13 +883,16 @@ class TrioGameManager:
             "current_player": next_player.name,
             "current_player_id": next_player.id
         })
-        
+
         await self.send_to_player(room_id, next_player.id, {
             "type": "your_turn",
             "message": "It's your turn! Reveal cards to find a trio."
         })
-        
+
         await self.send_game_state(room_id)
+
+        if next_player.is_cpu:
+            asyncio.create_task(self.cpu_take_turn(room_id, next_player.id))
 
     async def handle_seen_ack(self, room_id: str, player_id: str):
         """Handle a player's 'seen' acknowledgement after a failed turn or trio."""
@@ -916,6 +953,275 @@ class TrioGameManager:
                         "player": player.name,
                         "message": message
                     })
+
+
+    async def add_cpu_player(self, room_id: str, difficulty: str = "medium") -> Optional[Player]:
+        """Add a CPU-controlled player to a waiting room."""
+        room = self.get_room(room_id)
+        if not room or room.state != "waiting":
+            return None
+        if len(room.players) >= room.max_players:
+            return None
+
+        difficulty = difficulty if difficulty in ("easy", "medium", "hard") else "medium"
+        base_names = {"easy": "CPU (Easy)", "medium": "CPU (Medium)", "hard": "CPU (Hard)"}
+        base_name = base_names[difficulty]
+        name = base_name
+        existing_names = {p.name for p in room.players.values()}
+        counter = 2
+        while name in existing_names:
+            name = f"{base_name} #{counter}"
+            counter += 1
+
+        player_id = self.generate_player_id()
+        player = Player(
+            id=player_id,
+            name=name,
+            connected=True,
+            is_cpu=True,
+            cpu_difficulty=difficulty,
+        )
+        room.players[player_id] = player
+        self.player_rooms[player_id] = room_id
+
+        await self.broadcast(room_id, {
+            "type": "player_joined",
+            "player": player.to_public_dict(),
+            "room": room.to_dict(),
+        })
+        return player
+
+    async def cpu_take_turn(self, room_id: str, cpu_player_id: str):
+        """CPU player autonomously takes their turn."""
+        await asyncio.sleep(random.uniform(1.2, 2.5))
+
+        room = self.get_room(room_id)
+        if not room or room.state != "playing":
+            return
+        if room.current_player_id != cpu_player_id:
+            return
+        if room.acks_pending:
+            return
+
+        while True:
+            room = self.get_room(room_id)
+            if not room or room.state != "playing":
+                return
+            if room.current_player_id != cpu_player_id:
+                return
+            if room.acks_pending:
+                return
+
+            cpu_player = room.players.get(cpu_player_id)
+            if not cpu_player:
+                return
+
+            action = self._cpu_choose_reveal(room, cpu_player)
+
+            if action["type"] == "middle":
+                await self.reveal_from_middle(room_id, cpu_player_id, action["card_id"])
+            else:
+                await self.reveal_from_player(room_id, cpu_player_id, action["target_id"], action["position"])
+
+            # Check if turn is still ongoing after the reveal
+            room = self.get_room(room_id)
+            if not room or room.state != "playing":
+                return
+            if room.current_player_id != cpu_player_id:
+                return
+            if room.acks_pending:
+                return
+
+            # Still this CPU's turn — pause before next reveal
+            await asyncio.sleep(random.uniform(0.8, 1.5))
+
+    def _cpu_choose_reveal(self, room: "GameRoom", player: Player) -> dict:
+        """Choose what the CPU player should reveal based on difficulty."""
+        difficulty = player.cpu_difficulty
+        if difficulty == "easy":
+            return self._cpu_easy_choice(room)
+        elif difficulty == "medium":
+            return self._cpu_medium_choice(room)
+        else:
+            return self._cpu_hard_choice(room, player)
+
+    def _cpu_easy_choice(self, room: "GameRoom") -> dict:
+        """Easy: pure random reveal."""
+        choices = []
+        for card in room.middle_cards:
+            if room.middle_face_up.get(card.id, False) is False:
+                choices.append({"type": "middle", "card_id": card.id})
+        for pid, p in room.players.items():
+            if p.hand:
+                choices.append({"type": "player", "target_id": pid, "position": "lowest"})
+                choices.append({"type": "player", "target_id": pid, "position": "highest"})
+        return random.choice(choices) if choices else {"type": "middle", "card_id": -1}
+
+    def _cpu_medium_choice(self, room: "GameRoom") -> dict:
+        """Medium: memory-based — target cards known to match already-revealed numbers."""
+        revealed_numbers = [r.card.number for r in room.revealed_this_turn]
+        if revealed_numbers:
+            target_number = revealed_numbers[-1]
+            # Check middle cards
+            for card in room.middle_cards:
+                if room.middle_face_up.get(card.id, False) is False:
+                    if room.cpu_memory.get(card.id) == target_number:
+                        return {"type": "middle", "card_id": card.id}
+            # Check player cards
+            for pid, p in room.players.items():
+                if not p.hand:
+                    continue
+                lowest = p.get_lowest()
+                if lowest and room.cpu_memory.get(lowest.id) == target_number:
+                    return {"type": "player", "target_id": pid, "position": "lowest"}
+                highest = p.get_highest()
+                if highest and room.cpu_memory.get(highest.id) == target_number:
+                    return {"type": "player", "target_id": pid, "position": "highest"}
+        return self._cpu_easy_choice(room)
+
+    def _cpu_hard_choice(self, room: "GameRoom", player: Player) -> dict:
+        """Hard: strategic memory-based play with spicy-mode awareness.
+
+        Rules:
+        - Never reveal a card already known to mismatch the target number.
+        - Never reveal an unknown card from a player already tapped this turn
+          (avoids wasteful lowest→highest same-hand reveals).
+        - When no card is revealed yet: prefer numbers connected to own trios
+          (spicy) or numbers where we already know 2+ cards.
+        - Fall back gracefully through tiers rather than making random moves.
+        """
+        from collections import Counter
+
+        revealed = room.revealed_this_turn
+        revealed_numbers = [r.card.number for r in revealed]
+        # Players we've already drawn from this turn — don't pull unknown from them again
+        tapped_players = {r.source for r in revealed if r.source != "middle"}
+
+        if revealed_numbers:
+            target = revealed_numbers[-1]
+
+            # Tier 1: known card that matches target (any source)
+            result = self._hard_find_known(room, target)
+            if result:
+                return result
+
+            # Tier 2: unknown card, but NOT from a player we already tapped this turn
+            result = self._hard_find_unknown(room, exclude_players=tapped_players)
+            if result:
+                return result
+
+            # Tier 3: non-certain-fail card, still exclude tapped players
+            result = self._hard_find_nonfail(room, target, exclude_players=tapped_players)
+            if result:
+                return result
+
+            # Tier 4: last resort — ignore tapped-player restriction
+            result = self._hard_find_nonfail(room, target)
+            if result:
+                return result
+
+            return self._cpu_easy_choice(room)
+
+        else:
+            # No cards revealed yet — choose the best starting card
+
+            # In spicy mode, prioritize numbers connected to own existing trios
+            if room.mode == GameMode.SPICY and player.trios:
+                wanted = set()
+                for trio in player.trios:
+                    wanted.update(room.CONNECTIONS.get(trio[0].number, []))
+                for number in wanted:
+                    result = self._hard_find_known(room, number)
+                    if result:
+                        return result
+
+            # Find numbers where we already know 2+ face-down cards (near-complete trio)
+            known_counts = Counter(
+                room.cpu_memory.get(c.id)
+                for c in room.middle_cards
+                if room.middle_face_up.get(c.id, False) is False
+                and c.id in room.cpu_memory
+            )
+            for pid, p in room.players.items():
+                seen_ids = set()
+                for card in [p.get_lowest(), p.get_highest()]:
+                    if card and card.id not in seen_ids and card.id in room.cpu_memory:
+                        known_counts[room.cpu_memory[card.id]] += 1
+                        seen_ids.add(card.id)
+
+            best_numbers = [n for n, c in known_counts.most_common() if c >= 2]
+            for number in best_numbers:
+                result = self._hard_find_known(room, number)
+                if result:
+                    return result
+
+            # Otherwise reveal an unknown card to gain information
+            result = self._hard_find_unknown(room)
+            if result:
+                return result
+
+            return self._cpu_easy_choice(room)
+
+    def _hard_find_known(self, room: "GameRoom", target_number: int) -> Optional[dict]:
+        """Return a face-down card we know has exactly target_number, or None."""
+        for card in room.middle_cards:
+            if room.middle_face_up.get(card.id, False) is False:
+                if room.cpu_memory.get(card.id) == target_number:
+                    return {"type": "middle", "card_id": card.id}
+        for pid, p in room.players.items():
+            if not p.hand:
+                continue
+            lowest = p.get_lowest()
+            if lowest and room.cpu_memory.get(lowest.id) == target_number:
+                return {"type": "player", "target_id": pid, "position": "lowest"}
+            highest = p.get_highest()
+            if highest and (lowest is None or highest.id != lowest.id):
+                if room.cpu_memory.get(highest.id) == target_number:
+                    return {"type": "player", "target_id": pid, "position": "highest"}
+        return None
+
+    def _hard_find_unknown(self, room: "GameRoom", exclude_players: set = None) -> Optional[dict]:
+        """Return a card whose number we do not yet know (pure information gain)."""
+        exclude_players = exclude_players or set()
+        choices = []
+        for card in room.middle_cards:
+            if room.middle_face_up.get(card.id, False) is False and card.id not in room.cpu_memory:
+                choices.append({"type": "middle", "card_id": card.id})
+        for pid, p in room.players.items():
+            if pid in exclude_players or not p.hand:
+                continue
+            lowest = p.get_lowest()
+            if lowest and lowest.id not in room.cpu_memory:
+                choices.append({"type": "player", "target_id": pid, "position": "lowest"})
+            highest = p.get_highest()
+            if highest and (lowest is None or highest.id != lowest.id) and highest.id not in room.cpu_memory:
+                choices.append({"type": "player", "target_id": pid, "position": "highest"})
+        return random.choice(choices) if choices else None
+
+    def _hard_find_nonfail(self, room: "GameRoom", target_number: int,
+                           exclude_players: set = None) -> Optional[dict]:
+        """Return any card that won't certainly mismatch target_number (unknown or matching)."""
+        exclude_players = exclude_players or set()
+        choices = []
+        for card in room.middle_cards:
+            if room.middle_face_up.get(card.id, False) is False:
+                known = room.cpu_memory.get(card.id)
+                if known is None or known == target_number:
+                    choices.append({"type": "middle", "card_id": card.id})
+        for pid, p in room.players.items():
+            if pid in exclude_players or not p.hand:
+                continue
+            lowest = p.get_lowest()
+            if lowest:
+                known = room.cpu_memory.get(lowest.id)
+                if known is None or known == target_number:
+                    choices.append({"type": "player", "target_id": pid, "position": "lowest"})
+            highest = p.get_highest()
+            if highest and (lowest is None or highest.id != lowest.id):
+                known = room.cpu_memory.get(highest.id)
+                if known is None or known == target_number:
+                    choices.append({"type": "player", "target_id": pid, "position": "highest"})
+        return random.choice(choices) if choices else None
 
 
 async def _fire_commentary(manager: "TrioGameManager", room_id: str, event_type: str, details: dict):

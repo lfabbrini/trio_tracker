@@ -346,10 +346,26 @@
                 <h3 class="text-white font-bold mb-3">👥 Players</h3>
                 <div id="players-list" class="space-y-3"></div>
                 
+                <!-- Add CPU Player (waiting state only) -->
+                <div id="add-cpu-container" class="mt-3 hidden">
+                    <div class="flex gap-2">
+                        <select id="cpu-difficulty"
+                                class="select select-sm flex-1 text-white border-white/20 text-xs font-semibold"
+                                style="background-color: #334155;">
+                            <option value="easy" style="background-color: #334155; color: white;">🤖 Easy</option>
+                            <option value="medium" selected style="background-color: #334155; color: white;">🤖 Medium</option>
+                            <option value="hard" style="background-color: #334155; color: white;">🤖 Hard</option>
+                        </select>
+                        <button onclick="addCpuPlayer()" class="btn btn-sm bg-purple-600 hover:bg-purple-500 text-white border-0 text-xs">
+                            + CPU
+                        </button>
+                    </div>
+                </div>
+
                 <div id="start-game-container" class="mt-4 hidden">
-                    <button onclick="startGame()" 
+                    <button onclick="startGame()"
                             class="w-full py-2 rounded-lg font-bold
-                                   bg-gradient-to-r from-emerald-500 to-green-600 
+                                   bg-gradient-to-r from-emerald-500 to-green-600
                                    text-white hover:scale-105 transition-transform">
                         🎮 Start Game
                     </button>
@@ -450,7 +466,7 @@
         let previousRevealedIds = new Set();
         let ackTimer = null;
         let ackDeadline = null;
-        let ackCountdown = 10;
+        let ackCountdown = 15;
         
         // Connect to WebSocket
         function connect() {
@@ -505,6 +521,8 @@
                     currentPlayerName = data.current_player;
                     document.getElementById('mode-selection').classList.add('hidden');
                     document.getElementById('start-game-container').classList.add('hidden');
+                    const cpuContainerOnStart = document.getElementById('add-cpu-container');
+                    if (cpuContainerOnStart) cpuContainerOnStart.classList.add('hidden');
                     updateModeUI();
                     updateTurnBanner();
                     addChatMessage('System', `🎮 Game started! ${data.current_player} goes first.`, 'system');
@@ -689,7 +707,7 @@
             playersList.innerHTML = room.players.map(p => `
                 <div class="p-2 rounded-lg ${p.id === myPlayerId ? 'bg-yellow-500/20 border border-yellow-500/50' : 'bg-white/5'} ${p.id === room.current_player_id ? 'ring-2 ring-yellow-400' : ''}">
                     <div class="flex items-center justify-between">
-                        <span class="text-white font-semibold">${p.name}${p.id === myPlayerId ? ' (you)' : ''}</span>
+                        <span class="text-white font-semibold">${p.is_cpu ? '🤖 ' : ''}${p.name}${p.id === myPlayerId ? ' (you)' : ''}</span>
                         <span class="text-white/50 text-xs">${p.card_count} cards</span>
                     </div>
                     ${p.trios && p.trios.length > 0 ? `
@@ -707,7 +725,18 @@
             if (room.state === 'waiting' && room.player_count >= room.min_players) {
                 document.getElementById('start-game-container').classList.remove('hidden');
             }
-            
+
+            const addCpuContainer = document.getElementById('add-cpu-container');
+            if (addCpuContainer) {
+                const playerCount = room.player_count !== undefined ? room.player_count : (room.players ? room.players.length : 0);
+                const maxPlayers = room.max_players || 6;
+                if (room.state === 'waiting' && playerCount < maxPlayers) {
+                    addCpuContainer.classList.remove('hidden');
+                } else {
+                    addCpuContainer.classList.add('hidden');
+                }
+            }
+
             currentMode = room.mode;
             updateModeUI();
         }
@@ -1081,7 +1110,7 @@
 
         function startAckTimer() {
             clearAckTimer();
-            ackCountdown = 10;
+            ackCountdown = 15;
             ackDeadline = Date.now() + ackCountdown * 1000;
             ackTimer = setInterval(() => {
                 const remaining = Math.ceil((ackDeadline - Date.now()) / 1000);
@@ -1198,6 +1227,20 @@
             const data = await res.json();
             if (mic) mic.style.opacity = '1';
             if (data.audio) playTTSAudio(data.audio);
+        }
+
+        async function addCpuPlayer() {
+            const difficulty = document.getElementById('cpu-difficulty').value;
+            try {
+                await fetch(`/game/${roomId}/add-cpu`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                    body: `difficulty=${difficulty}`
+                });
+                // Success is communicated via WS player_joined broadcast
+            } catch (e) {
+                addChatMessage('Error', 'Failed to add CPU player', 'error');
+            }
         }
 
         // Start
