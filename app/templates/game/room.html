@@ -84,6 +84,10 @@
             font-size: 2.5rem;
             color: rgba(255,255,255,0.3);
         }
+
+        .playing-card.small.face-down::before {
+            font-size: 1.6rem;
+        }
         
         .playing-card.face-down:hover:not(.disabled) {
             transform: translateY(-5px);
@@ -389,7 +393,7 @@
                     📦 Middle Cards 
                     <span id="middle-count" class="text-yellow-400">(0)</span>
                 </h3>
-                <div id="middle-cards" class="flex flex-wrap gap-2 justify-center min-h-[100px]">
+                <div id="middle-cards" class="flex justify-center min-h-[100px]">
                     <p class="text-white/30">Game hasn't started yet</p>
                 </div>
             </div>
@@ -786,30 +790,28 @@
                 return;
             }
             
-            container.innerHTML = middleCards.map(card => {
+            function renderOneMiddle(card) {
                 if (card.taken) {
-                    return `
-                        <div class="playing-card empty-space" style="cursor: default; opacity: 0.2; border: 2px dashed rgba(255,255,255,0.2);">
-                        </div>
-                    `;
+                    return `<div class="playing-card small empty-space" style="cursor: default; opacity: 0.2; border: 2px dashed rgba(255,255,255,0.2);"></div>`;
                 } else if (card.face_up) {
                     const isRevealed = revealedCards.some(r => r.source_id === 'middle' && r.card.id === card.id);
                     const isNew = isRevealed && !previousRevealedIds.has(card.id);
-                    return `
-                        <div class="playing-card ${getCardColor(card.id)} revealed disabled ${isNew ? 'card-reveal-anim' : ''}"
-                             ${isRevealed ? 'data-revealed-card="true"' : ''}>
-                            <span class="number">${card.number}</span>
-                            <span class="suit">${getCardSuit(card.id)}</span>
-                        </div>
-                    `;
+                    return `<div class="playing-card small ${getCardColor(card.id)} revealed disabled ${isNew ? 'card-reveal-anim' : ''}"
+                                 ${isRevealed ? 'data-revealed-card="true"' : ''}>
+                                <span class="number">${card.number}</span>
+                                <span class="suit">${getCardSuit(card.id)}</span>
+                            </div>`;
                 } else {
-                    return `
-                        <div class="playing-card face-down ${!isMyTurn ? 'disabled' : ''}"
-                             onclick="revealMiddle(${card.id})">
-                        </div>
-                    `;
+                    return `<div class="playing-card small face-down ${!isMyTurn ? 'disabled' : ''}"
+                                 onclick="revealMiddle(${card.id})"></div>`;
                 }
-            }).join('');
+            }
+
+            const splitAt = Math.ceil(middleCards.length / 2);
+            const row1 = middleCards.slice(0, splitAt);
+            const row2 = middleCards.slice(splitAt);
+            const rowHtml = (cards) => `<div class="flex gap-2">${cards.map(renderOneMiddle).join('')}</div>`;
+            container.innerHTML = `<div class="inline-flex flex-col gap-2">${rowHtml(row1)}${row2.length ? rowHtml(row2) : ''}</div>`;
         }
         
         // Render other players
