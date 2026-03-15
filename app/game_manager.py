@@ -860,6 +860,20 @@ class TrioGameManager:
             {"name": p.name, "trios": len(p.trios)}
             for p in sorted(room.players.values(), key=lambda x: len(x.trios), reverse=True)
         ]
+        # Build full card reveal data
+        middle_reveal = [
+            {
+                "id": c.id,
+                "number": c.number,
+                "face_up": True,
+                "taken": room.middle_face_up.get(c.id) == "taken",
+            }
+            for c in room.middle_cards
+        ]
+        player_hands = {
+            pid: [c.to_dict() for c in p.hand]
+            for pid, p in room.players.items()
+        }
         await self.broadcast(room_id, {
             "type": "game_over",
             "winner": player.name,
@@ -867,6 +881,8 @@ class TrioGameManager:
             "reason": reason,
             "message": f"🏆 {player.name} wins! {reason}",
             "final_scores": final_scores,
+            "middle_cards": middle_reveal,
+            "player_hands": player_hands,
         })
 
         # Fire-and-forget commentary

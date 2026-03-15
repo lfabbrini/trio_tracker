@@ -648,6 +648,29 @@
                     
                 case 'game_over':
                     gameState = 'finished';
+                    // Reveal all cards
+                    if (data.middle_cards) {
+                        middleCards = data.middle_cards;
+                    }
+                    if (data.player_hands) {
+                        // Inject all hand cards as revealed entries so renderOtherPlayers shows them face-up
+                        const allHandReveals = [];
+                        for (const [pid, cards] of Object.entries(data.player_hands)) {
+                            for (const card of cards) {
+                                allHandReveals.push({ card, source_id: pid, source: pid, position: null });
+                            }
+                        }
+                        revealedCards = allHandReveals;
+                        // Zero card_count so no face-down placeholders appear
+                        Object.values(players).forEach(p => { p.card_count = 0; });
+                        renderMiddleCards();
+                        renderOtherPlayers(Object.values(players), null);
+                        // Own hand: already visible to the player, but re-render with empty hand to avoid duplicates
+                        if (myHandData) {
+                            myHandData = { hand: [] };
+                            renderHand(myHandData);
+                        }
+                    }
                     addChatMessage('System', data.message, 'success');
                     document.getElementById('turn-banner').textContent = `🏆 ${data.winner} WINS!`;
                     document.getElementById('turn-banner').className = 'turn-banner';
