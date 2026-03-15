@@ -349,9 +349,9 @@ async def game_room(request: Request, room_id: str):
 
 
 @app.post("/game/{room_id}/add-cpu")
-async def add_cpu_to_room(room_id: str, difficulty: str = Form("medium")):
+async def add_cpu_to_room(room_id: str):
     """Add a CPU player to a waiting game room."""
-    player = await game_manager.add_cpu_player(room_id, difficulty)
+    player = await game_manager.add_cpu_player(room_id)
     if not player:
         raise HTTPException(status_code=400, detail="Could not add CPU player (room full, not found, or already started)")
     return JSONResponse({"success": True, "player": player.to_public_dict()})
