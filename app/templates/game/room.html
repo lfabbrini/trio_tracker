@@ -54,16 +54,18 @@
             border: 1px solid #ddd;
         }
         
-        .playing-card .number {
-            font-size: 1.5rem;
-            font-weight: bold;
+        .playing-card .card-corner {
+            position: absolute;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
             line-height: 1;
         }
-        
-        .playing-card .suit {
-            font-size: 1.75rem;
-            line-height: 1;
-        }
+        .playing-card .card-corner.top-left { top: 3px; left: 4px; }
+        .playing-card .card-corner.bottom-right { bottom: 3px; right: 4px; transform: rotate(180deg); }
+        .playing-card .corner-number { font-size: 0.85rem; font-weight: bold; }
+        .playing-card .corner-suit { font-size: 0.65rem; }
+        .playing-card .card-center-suit { font-size: 1.75rem; }
         
         .playing-card.red { color: #dc2626; }
         .playing-card.black { color: #1f2937; }
@@ -130,8 +132,11 @@
             height: 63px;
         }
         
-        .playing-card.small .number { font-size: 1rem; }
-        .playing-card.small .suit { font-size: 1.25rem; }
+        .playing-card.small .corner-number { font-size: 0.55rem; }
+        .playing-card.small .corner-suit { font-size: 0.45rem; }
+        .playing-card.small .card-center-suit { font-size: 1.1rem; }
+        .playing-card.small .card-corner.top-left { top: 2px; left: 2px; }
+        .playing-card.small .card-corner.bottom-right { bottom: 2px; right: 2px; }
         
         /* Card corner labels */
         .card-label {
@@ -143,19 +148,60 @@
         }
         
         .card-label.low {
-            bottom: 2px;
-            left: 2px;
+            top: 2px;
+            right: 2px;
             background: #3b82f6;
             color: white;
         }
-        
+
         .card-label.high {
-            bottom: 2px;
+            top: 2px;
             right: 2px;
             background: #ef4444;
             color: white;
         }
-        
+
+        /* ---- Card Themes ---- */
+
+        /* NATURE */
+        [data-card-theme="nature"] .playing-card:not(.face-down):not(.empty-space) {
+            background: linear-gradient(145deg, #f5f0e8, #e8dcc8);
+            border-color: #a0845c;
+        }
+        [data-card-theme="nature"] .playing-card.red { color: #b44d2e; }
+        [data-card-theme="nature"] .playing-card.black { color: #2d4a2e; }
+        [data-card-theme="nature"] .playing-card.face-down {
+            background: linear-gradient(145deg, #2d5a27, #1a3a15);
+            border-color: #4a8c3f;
+        }
+
+        /* NEON */
+        [data-card-theme="neon"] .playing-card:not(.face-down):not(.empty-space) {
+            background: linear-gradient(145deg, #1a1a2e, #16213e);
+            border-color: #0f3460;
+        }
+        [data-card-theme="neon"] .playing-card.red { color: #ff2e63; text-shadow: 0 0 8px rgba(255,46,99,0.6); }
+        [data-card-theme="neon"] .playing-card.black { color: #00fff5; text-shadow: 0 0 8px rgba(0,255,245,0.6); }
+        [data-card-theme="neon"] .playing-card .card-center-suit { filter: drop-shadow(0 0 6px currentColor); }
+        [data-card-theme="neon"] .playing-card.face-down {
+            background: linear-gradient(145deg, #0a0a2e, #1a0a3e);
+            border-color: #7b2ff7;
+            box-shadow: 0 0 10px rgba(123,47,247,0.3);
+        }
+
+        /* ROYAL */
+        [data-card-theme="royal"] .playing-card:not(.face-down):not(.empty-space) {
+            background: linear-gradient(145deg, #fef9e7, #f5e6c8);
+            border-color: #c9a84c;
+            box-shadow: 0 4px 15px rgba(201,168,76,0.3);
+        }
+        [data-card-theme="royal"] .playing-card.red { color: #8b0000; }
+        [data-card-theme="royal"] .playing-card.black { color: #2c1654; }
+        [data-card-theme="royal"] .playing-card.face-down {
+            background: linear-gradient(145deg, #4a0e4e, #2c0a3a);
+            border-color: #c9a84c;
+        }
+
         /* Player action buttons */
         .player-action-btn {
             padding: 0.375rem 0.75rem;
@@ -344,7 +390,31 @@
                     Win with 3 trios or the 7-trio
                 </p>
             </div>
-            
+
+            <!-- Card Theme Selection -->
+            <div id="theme-selection" class="card-glow rounded-xl p-4">
+                <h3 class="text-white font-bold mb-3">🎨 Card Theme</h3>
+                <div class="grid grid-cols-2 gap-2">
+                    <button onclick="setTheme('classic')" id="btn-theme-classic"
+                            class="py-2 px-3 rounded-lg font-semibold text-sm bg-indigo-500 text-white">
+                        🃏 Classic
+                    </button>
+                    <button onclick="setTheme('nature')" id="btn-theme-nature"
+                            class="py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70">
+                        🌿 Nature
+                    </button>
+                    <button onclick="setTheme('neon')" id="btn-theme-neon"
+                            class="py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70">
+                        💡 Neon
+                    </button>
+                    <button onclick="setTheme('royal')" id="btn-theme-royal"
+                            class="py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70">
+                        👑 Royal
+                    </button>
+                </div>
+                <p id="theme-description" class="text-white/50 text-xs mt-2">Traditional red & black playing cards</p>
+            </div>
+
             <!-- Players -->
             <div class="card-glow rounded-xl p-4">
                 <h3 class="text-white font-bold mb-3">👥 Players</h3>
@@ -428,17 +498,43 @@
     </footer>
     
     <script>
-        // Card suits for display
-        const SUITS = ['♠', '♥', '♣', '♦'];
-        const SUIT_COLORS = { '♠': 'black', '♥': 'red', '♣': 'black', '♦': 'red' };
-        
-        // Map card numbers to suits (deterministic based on card id)
+        // Card suits for display — theme-aware
+        const THEME_SUITS = {
+            classic: ['♠', '♥', '♣', '♦'],
+            nature:  ['🌿', '🌸', '🍂', '💧'],
+            neon:    ['♠', '♥', '♣', '♦'],
+            royal:   ['♠', '♥', '♣', '♦'],
+        };
+        const THEME_SUIT_COLORS = {
+            classic: { '♠': 'black', '♥': 'red', '♣': 'black', '♦': 'red' },
+            nature:  { '🌿': 'black', '🌸': 'red', '🍂': 'black', '💧': 'red' },
+            neon:    { '♠': 'black', '♥': 'red', '♣': 'black', '♦': 'red' },
+            royal:   { '♠': 'black', '♥': 'red', '♣': 'black', '♦': 'red' },
+        };
+
         function getCardSuit(cardId) {
-            return SUITS[cardId % 4];
+            return (THEME_SUITS[currentTheme] || THEME_SUITS.classic)[cardId % 4];
         }
-        
+
         function getCardColor(cardId) {
-            return SUIT_COLORS[getCardSuit(cardId)];
+            const suits = THEME_SUIT_COLORS[currentTheme] || THEME_SUIT_COLORS.classic;
+            return suits[getCardSuit(cardId)];
+        }
+
+        function renderCardInner(cardId, number) {
+            const suit = getCardSuit(cardId);
+            const label = cardLabel(number);
+            return `
+                <span class="card-corner top-left">
+                    <span class="corner-number">${label}</span>
+                    <span class="corner-suit">${suit}</span>
+                </span>
+                <span class="card-center-suit">${suit}</span>
+                <span class="card-corner bottom-right">
+                    <span class="corner-number">${label}</span>
+                    <span class="corner-suit">${suit}</span>
+                </span>
+            `;
         }
 
         function cardLabel(n) {
@@ -457,6 +553,7 @@
         let isMyTurn = false;
         let gameState = 'waiting';
         let currentMode = 'simple';
+        let currentTheme = 'classic';
         let players = {};
         let middleCards = [];
         let revealedCards = [];
@@ -516,12 +613,21 @@
                     updateModeUI();
                     addChatMessage('System', `Mode: ${data.mode.toUpperCase()}`, 'system');
                     break;
+
+                case 'theme_changed':
+                    currentTheme = data.theme;
+                    updateThemeUI();
+                    addChatMessage('System', `Theme: ${data.theme.charAt(0).toUpperCase() + data.theme.slice(1)}`, 'system');
+                    break;
                     
                 case 'game_started':
                     gameState = 'playing';
                     currentMode = data.mode;
+                    currentTheme = data.room.theme;
+                    updateThemeUI();
                     currentPlayerName = data.current_player;
                     document.getElementById('mode-selection').classList.add('hidden');
+                    document.getElementById('theme-selection').classList.add('hidden');
                     document.getElementById('start-game-container').classList.add('hidden');
                     const cpuContainerOnStart = document.getElementById('add-cpu-container');
                     if (cpuContainerOnStart) cpuContainerOnStart.classList.add('hidden');
@@ -723,7 +829,12 @@
         function updateRoom(room) {
             players = {};
             room.players.forEach(p => players[p.id] = p);
-            
+
+            if (room.theme) {
+                currentTheme = room.theme;
+                updateThemeUI();
+            }
+
             if (room.current_player) {
                 currentPlayerName = room.current_player;
             }
@@ -800,12 +911,10 @@
         
         // Render card HTML
         function renderCard(cardData, extraClass = '', clickHandler = '') {
-            const suit = getCardSuit(cardData.id);
             const color = getCardColor(cardData.id);
             return `
                 <div class="playing-card ${color} ${extraClass}" ${clickHandler}>
-                    <span class="number">${cardData.number}</span>
-                    <span class="suit">${suit}</span>
+                    ${renderCardInner(cardData.id, cardData.number)}
                 </div>
             `;
         }
@@ -827,8 +936,7 @@
                     const isNew = isRevealed && !previousRevealedIds.has(card.id);
                     return `<div class="playing-card small ${getCardColor(card.id)} revealed disabled ${isNew ? 'card-reveal-anim' : ''}"
                                  ${isRevealed ? 'data-revealed-card="true"' : ''}>
-                                <span class="number">${cardLabel(card.number)}</span>
-                                <span class="suit">${getCardSuit(card.id)}</span>
+                                ${renderCardInner(card.id, card.number)}
                             </div>`;
                 } else {
                     return `<div class="playing-card small face-down ${!isMyTurn ? 'disabled' : ''}"
@@ -922,8 +1030,7 @@
                                     <div class="text-center">
                                         <div class="playing-card small ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
                                              data-revealed-card="true" style="cursor: default;">
-                                            <span class="number">${cardLabel(r.card.number)}</span>
-                                            <span class="suit">${getCardSuit(r.card.id)}</span>
+                                            ${renderCardInner(r.card.id, r.card.number)}
                                         </div>
                                         <p class="text-white/40 text-[0.6rem] mt-0.5">${r.position || ''}</p>
                                     </div>`;
@@ -980,8 +1087,7 @@
                     <div class="text-center">
                         <div class="playing-card ${getCardColor(r.card.id)} revealed ${isNew ? 'card-reveal-anim' : ''}"
                              data-revealed-card="true" style="cursor: default;">
-                            <span class="number">${cardLabel(r.card.number)}</span>
-                            <span class="suit">${getCardSuit(r.card.id)}</span>
+                            ${renderCardInner(r.card.id, r.card.number)}
                         </div>
                         <p class="text-yellow-400/70 text-[0.6rem] font-bold mt-0.5">REVEALED</p>
                     </div>
@@ -1015,8 +1121,7 @@
                     <div class="playing-card ${getCardColor(card.id)} ${isClickable ? 'clickable-card' : ''}"
                          style="cursor: ${isClickable ? 'pointer' : 'default'};"
                          ${clickHandler}>
-                        <span class="number">${cardLabel(card.number)}</span>
-                        <span class="suit">${getCardSuit(card.id)}</span>
+                        ${renderCardInner(card.id, card.number)}
                         ${isLow ? '<span class="card-label low">LOW</span>' : ''}
                         ${isHigh && !isOnlyCard ? '<span class="card-label high">HIGH</span>' : ''}
                     </div>
@@ -1057,7 +1162,39 @@
             }
         }
         
+        // Theme UI
+        const THEME_DESCRIPTIONS = {
+            classic: 'Traditional red & black playing cards',
+            nature:  'Earth-toned cards with nature symbols',
+            neon:    'Dark cards with glowing neon colors',
+            royal:   'Elegant cream & gold royal style',
+        };
+
+        function updateThemeUI() {
+            document.body.setAttribute('data-card-theme', currentTheme);
+            const themes = ['classic', 'nature', 'neon', 'royal'];
+            themes.forEach(t => {
+                const btn = document.getElementById('btn-theme-' + t);
+                if (btn) {
+                    btn.className = t === currentTheme
+                        ? 'py-2 px-3 rounded-lg font-semibold text-sm bg-indigo-500 text-white'
+                        : 'py-2 px-3 rounded-lg font-semibold text-sm bg-slate-600 text-white/70';
+                }
+            });
+            const desc = document.getElementById('theme-description');
+            if (desc) desc.textContent = THEME_DESCRIPTIONS[currentTheme] || '';
+            // Re-render cards if game is playing
+            if (gameState === 'playing') {
+                renderMiddleCards();
+                if (myHandData) renderHand(myHandData);
+            }
+        }
+
         // Actions
+        function setTheme(theme) {
+            ws.send(JSON.stringify({ action: 'set_theme', theme: theme }));
+        }
+
         function setMode(mode) {
             ws.send(JSON.stringify({ action: 'set_mode', mode: mode }));
         }

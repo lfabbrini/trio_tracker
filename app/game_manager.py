@@ -25,6 +25,13 @@ class GameMode(Enum):
     SPICY = "spicy"
 
 
+class CardTheme(Enum):
+    CLASSIC = "classic"
+    NATURE = "nature"
+    NEON = "neon"
+    ROYAL = "royal"
+
+
 @dataclass
 class Card:
     """A Trio card with a number (1-12)."""
@@ -115,6 +122,7 @@ class GameRoom:
     id: str
     name: str
     mode: GameMode = GameMode.SIMPLE
+    theme: CardTheme = CardTheme.CLASSIC
     players: Dict[str, Player] = field(default_factory=dict)
     player_order: List[str] = field(default_factory=list)
     
@@ -187,6 +195,7 @@ class GameRoom:
             "id": self.id,
             "name": self.name,
             "mode": self.mode.value,
+            "theme": self.theme.value,
             "player_count": len(self.players),
             "max_players": self.max_players,
             "min_players": self.min_players,
@@ -370,7 +379,22 @@ class TrioGameManager:
             "mode": room.mode.value,
             "room": room.to_dict()
         })
-    
+
+    async def set_card_theme(self, room_id: str, player_id: str, theme: str):
+        """Set the card theme (only before game starts)."""
+        room = self.get_room(room_id)
+        if not room or room.state != "waiting":
+            return
+
+        theme_map = {t.value: t for t in CardTheme}
+        room.theme = theme_map.get(theme.lower(), CardTheme.CLASSIC)
+
+        await self.broadcast(room_id, {
+            "type": "theme_changed",
+            "theme": room.theme.value,
+            "room": room.to_dict()
+        })
+
     async def start_game(self, room_id: str, player_id: str):
         """Start the game."""
         room = self.get_room(room_id)
@@ -943,7 +967,10 @@ class TrioGameManager:
         if action == "set_mode":
             mode = data.get("mode", "simple")
             await self.set_game_mode(room_id, player_id, mode)
-        
+
+        elif action == "set_theme":
+            await self.set_card_theme(room_id, player_id, data.get("theme", "classic"))
+
         elif action == "start_game":
             await self.start_game(room_id, player_id)
         
