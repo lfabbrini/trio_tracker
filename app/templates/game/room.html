@@ -64,8 +64,31 @@
         .playing-card .card-corner.top-left { top: 3px; left: 4px; }
         .playing-card .card-corner.bottom-right { bottom: 3px; right: 4px; transform: rotate(180deg); }
         .playing-card .corner-number { font-size: 0.85rem; font-weight: bold; }
-        .playing-card .corner-suit { font-size: 0.65rem; }
-        .playing-card .card-center-suit { font-size: 1.75rem; }
+        /* Pip area for number cards */
+        .pip-area {
+            position: absolute;
+            top: 16px; bottom: 16px; left: 6px; right: 6px;
+        }
+        .pip {
+            position: absolute;
+            font-size: 13px;
+            transform: translate(-50%, -50%);
+            line-height: 1;
+        }
+        .pip.inverted { transform: translate(-50%, -50%) rotate(180deg); }
+
+        /* Face card center */
+        .face-card-center {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .face-icon { font-size: 0.8rem; line-height: 1; }
+        .face-letter { font-size: 1.4rem; font-weight: bold; font-family: 'Playfair Display', serif; line-height: 1; }
+        .face-suit { font-size: 0.7rem; line-height: 1; }
         
         .playing-card.red { color: #dc2626; }
         .playing-card.black { color: #1f2937; }
@@ -133,8 +156,11 @@
         }
         
         .playing-card.small .corner-number { font-size: 0.55rem; }
-        .playing-card.small .corner-suit { font-size: 0.45rem; }
-        .playing-card.small .card-center-suit { font-size: 1.1rem; }
+        .playing-card.small .pip-area { top: 12px; bottom: 12px; left: 4px; right: 4px; }
+        .playing-card.small .pip { font-size: 9px; }
+        .playing-card.small .face-icon { font-size: 0.55rem; }
+        .playing-card.small .face-letter { font-size: 0.95rem; }
+        .playing-card.small .face-suit { font-size: 0.5rem; }
         .playing-card.small .card-corner.top-left { top: 2px; left: 2px; }
         .playing-card.small .card-corner.bottom-right { bottom: 2px; right: 2px; }
         
@@ -174,6 +200,8 @@
             background: linear-gradient(145deg, #2d5a27, #1a3a15);
             border-color: #4a8c3f;
         }
+        [data-card-theme="nature"] .pip { font-size: 8px; }
+        [data-card-theme="nature"] .playing-card.small .pip { font-size: 6px; }
 
         /* NEON */
         [data-card-theme="neon"] .playing-card:not(.face-down):not(.empty-space) {
@@ -182,7 +210,8 @@
         }
         [data-card-theme="neon"] .playing-card.red { color: #ff2e63; text-shadow: 0 0 8px rgba(255,46,99,0.6); }
         [data-card-theme="neon"] .playing-card.black { color: #00fff5; text-shadow: 0 0 8px rgba(0,255,245,0.6); }
-        [data-card-theme="neon"] .playing-card .card-center-suit { filter: drop-shadow(0 0 6px currentColor); }
+        [data-card-theme="neon"] .pip { filter: none; text-shadow: none; }
+        [data-card-theme="neon"] .face-card-center { filter: drop-shadow(0 0 6px currentColor); }
         [data-card-theme="neon"] .playing-card.face-down {
             background: linear-gradient(145deg, #0a0a2e, #1a0a3e);
             border-color: #7b2ff7;
@@ -521,20 +550,58 @@
             return suits[getCardSuit(cardId)];
         }
 
+        // Pip positions: [x%, y%] within pip-area for each card number
+        const PIP_LAYOUTS = {
+            1:  [[50,50]],
+            2:  [[50,8],[50,92]],
+            3:  [[50,8],[50,50],[50,92]],
+            4:  [[15,8],[85,8],[15,92],[85,92]],
+            5:  [[15,8],[85,8],[50,50],[15,92],[85,92]],
+            6:  [[15,8],[85,8],[15,50],[85,50],[15,92],[85,92]],
+            7:  [[15,8],[85,8],[15,50],[85,50],[50,30],[15,92],[85,92]],
+            8:  [[15,8],[85,8],[15,50],[85,50],[50,28],[50,72],[15,92],[85,92]],
+            9:  [[15,8],[85,8],[15,36],[85,36],[50,50],[15,64],[85,64],[15,92],[85,92]],
+            10: [[15,8],[85,8],[50,20],[15,36],[85,36],[15,64],[85,64],[50,80],[15,92],[85,92]],
+        };
+
+        // Face card icons per theme
+        const FACE_ICONS = {
+            classic: { 11: '⚔', 12: '👑' },
+            nature:  { 11: '🌲', 12: '👑' },
+            neon:    { 11: '⚡', 12: '💎' },
+            royal:   { 11: '⚔', 12: '👑' },
+        };
+
         function renderCardInner(cardId, number) {
             const suit = getCardSuit(cardId);
             const label = cardLabel(number);
-            return `
+            const corners = `
                 <span class="card-corner top-left">
                     <span class="corner-number">${label}</span>
-                    <span class="corner-suit">${suit}</span>
                 </span>
-                <span class="card-center-suit">${suit}</span>
                 <span class="card-corner bottom-right">
                     <span class="corner-number">${label}</span>
-                    <span class="corner-suit">${suit}</span>
-                </span>
-            `;
+                </span>`;
+
+            if (number >= 1 && number <= 10) {
+                const positions = PIP_LAYOUTS[number];
+                const isSingleChar = suit.length === 1;
+                const pips = positions.map(([x, y]) => {
+                    const inv = (y > 55 && isSingleChar) ? ' inverted' : '';
+                    return `<span class="pip${inv}" style="left:${x}%;top:${y}%">${suit}</span>`;
+                }).join('');
+                return corners + `<div class="pip-area">${pips}</div>`;
+            } else {
+                // Face cards (J=11, Q=12)
+                const icons = FACE_ICONS[currentTheme] || FACE_ICONS.classic;
+                const icon = icons[number] || '';
+                return corners + `
+                    <div class="face-card-center">
+                        <span class="face-icon">${icon}</span>
+                        <span class="face-letter">${label}</span>
+                        <span class="face-suit">${suit}</span>
+                    </div>`;
+            }
         }
 
         function cardLabel(n) {
